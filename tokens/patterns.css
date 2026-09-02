@@ -1,0 +1,9 @@
+:root{
+/* The brand pattern is a run of flat vertical bars of uneven width.
+   These recreate it as CSS so it can stretch behind any panel; the
+   original artwork also lives in assets/pattern-*.svg. */
+--pattern-lime-stripe: repeating-linear-gradient(90deg, var(--oj-lime-100) 0 46px, var(--oj-lime-50) 46px 70px, var(--oj-lime-100) 70px 132px, var(--oj-lime-50) 132px 144px); /* @kind other */
+--pattern-green-stripe: repeating-linear-gradient(90deg, var(--oj-green-700) 0 52px, var(--oj-green-800) 52px 76px, var(--oj-green-700) 76px 140px, var(--oj-green-600) 140px 152px); /* @kind other */
+--pattern-market-bars: linear-gradient(90deg, var(--oj-red-500) 0 2.2%, transparent 2.2% 6%, var(--oj-green-700) 6% 20%, transparent 20% 22.5%, var(--oj-green-500) 22.5% 23.6%, transparent 23.6% 27%, var(--oj-yellow-500) 27% 55%, transparent 55% 56.5%, var(--oj-brown-500) 56.5% 60.5%, transparent 60.5% 63%, var(--oj-green-500) 63% 74%, transparent 74% 77.5%, var(--oj-yellow-500) 77.5% 78.6%, transparent 78.6% 81.5%, var(--oj-brown-500) 81.5% 100%); /* @kind other */
+--pattern-brand-mark: url("../assets/icon.svg"); /* @kind other */
+}

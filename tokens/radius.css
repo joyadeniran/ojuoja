@@ -1,0 +1,16 @@
+:root{
+--radius-xs: 6px;
+--radius-sm: 8px;
+--radius-md: 12px;
+--radius-lg: 16px;
+--radius-xl: 24px;
+--radius-2xl: 32px;
+--radius-pill: 999px;
+--radius-circle: 50%;
+/* Rule of thumb: anything you click is a pill, anything that holds
+   content is 12-16px, anything full-bleed is square. */
+--radius-control: var(--radius-pill);
+--radius-card: var(--radius-lg);
+--radius-media: var(--radius-md);
+--radius-sheet: var(--radius-xl);
+}

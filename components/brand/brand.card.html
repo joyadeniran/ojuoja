@@ -1,0 +1,26 @@
+<!-- @dsCard group="Components" viewport="700x300" name="Brand" subtitle="Logo, brand mark, icon set, pattern field" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Brand</title><link rel="stylesheet" href="../../styles.css">
+<script>window.OJUOJA_ICON_BASE="../../assets/icons";window.OJUOJA_ASSET_BASE="../../assets";</script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{padding:18px 20px;background:#fff}.row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}.col{display:flex;flex-direction:column;gap:14px}.lbl{font:600 10px/1 var(--font-body);letter-spacing:.09em;text-transform:uppercase;color:var(--text-faint)}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">const {Logo,Icon,PatternPanel}=window.OjuojaDesignSystem_fd3102;
+const icons=['shopping-basket','search','map-pin','bike','badge-check','store','wallet','truck','clock','heart','star','leaf','flame','percent','user','package'];
+function App(){return <div className="col">
+<div className="row" style={{gap:32}}>
+<Logo height={30}/>
+<Logo mark height={34}/>
+<div style={{background:'var(--surface-brand)',padding:'12px 20px',borderRadius:'var(--radius-md)'}}><Logo variant="white" height={24}/></div>
+<Logo variant="black" height={22}/>
+</div>
+<div className="row" style={{color:'var(--text-brand)',gap:18}}>{icons.map(n=><Icon key={n} name={n} size={22}/>)}</div>
+<div className="row" style={{gap:10}}>
+<PatternPanel variant="lime" padded={false} style={{width:210,height:88,borderRadius:'var(--radius-md)'}}/>
+<PatternPanel variant="green" padded={false} style={{width:210,height:88,borderRadius:'var(--radius-md)'}}/>
+<PatternPanel variant="market" padded={false} style={{width:210,height:88,borderRadius:'var(--radius-md)'}}/>
+</div>
+</div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);</script></body></html>

@@ -1,0 +1,33 @@
+:root{
+--space-0: 0px;
+--space-1: 2px;
+--space-2: 4px;
+--space-3: 6px;
+--space-4: 8px;
+--space-5: 12px;
+--space-6: 16px;
+--space-7: 20px;
+--space-8: 24px;
+--space-9: 32px;
+--space-10: 40px;
+--space-11: 48px;
+--space-12: 64px;
+--space-13: 80px;
+--space-14: 96px;
+--space-15: 120px;
+--space-16: 160px;
+
+/* Layout: ojuoja.shop is drawn on a 1440 frame with a 1140 content column. */
+--layout-max: 1140px;
+--layout-max-wide: 1320px;
+--layout-gutter: 24px;
+--layout-gutter-lg: 40px;
+--layout-section-y: 96px;
+--layout-section-y-sm: 64px;
+--layout-grid-gap: 24px;
+--layout-header-h: 76px;
+--control-h-sm: 34px;
+--control-h-md: 44px;
+--control-h-lg: 54px;
+--hit-min: 44px;
+}

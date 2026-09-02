@@ -1,0 +1,103 @@
+:root{
+/* --- Brand core, straight from the mini-guide colour palette page --- */
+--oj-green: #00B737;
+--oj-yellow: #FFAB00;
+--oj-brown: #AD7A4A;
+--oj-red: #FF0000;
+
+/* --- Green scale. 700 is the working product green used on ojuoja.shop
+       buttons, footer and section headings; 900 is the hero headline ink. --- */
+--oj-green-50: #E9F7EF;
+--oj-green-100: #CFEBDC;
+--oj-green-200: #A8DBBF;
+--oj-green-300: #5FBB8A;
+--oj-green-400: #30A668;
+--oj-green-500: #00B737;
+--oj-green-600: #00A03D;
+--oj-green-700: #009245;
+--oj-green-800: #06693A;
+--oj-green-900: #084525;
+
+/* --- Lime / chartreuse. The signature Ojuoja surface: hero panels,
+       promo bands, empty states. --- */
+--oj-lime-50: #FAFFE5;
+--oj-lime-100: #F3FFC3;
+--oj-lime-200: #E4F59B;
+--oj-lime-300: #CCC558;
+
+/* --- Yellow scale (accent, the dot on the "ọ") --- */
+--oj-yellow-50: #FFF7E5;
+--oj-yellow-100: #FFE9B3;
+--oj-yellow-300: #FFC94D;
+--oj-yellow-500: #FFAB00;
+--oj-yellow-600: #E09600;
+--oj-yellow-700: #B87A00;
+
+/* --- Brown scale (market / craft warmth, used in promo blocks) --- */
+--oj-brown-50: #F7F0E9;
+--oj-brown-100: #EBDACA;
+--oj-brown-500: #AD7A4A;
+--oj-brown-600: #96663B;
+--oj-brown-700: #7A5230;
+
+/* --- Red scale (pure guide red; alerts, sale flags) --- */
+--oj-red-50: #FFECEC;
+--oj-red-100: #FFC9C9;
+--oj-red-500: #FF0000;
+--oj-red-600: #D90000;
+--oj-red-700: #A80000;
+
+/* --- Neutrals --- */
+--oj-white: #FFFFFF;
+--oj-grey-50: #F6F7F7;
+--oj-grey-100: #EDEEEE;
+--oj-grey-200: #E4E6E5;
+--oj-grey-300: #D2D6D4;
+--oj-grey-400: #9AA3A0;
+--oj-grey-500: #6B7472;
+--oj-grey-600: #4A5250;
+--oj-grey-800: #262B2A;
+--oj-black: #000000;
+
+/* --- Semantic aliases: use these in product code --- */
+--surface-page: var(--oj-white);
+--surface-card: var(--oj-grey-50);
+--surface-raised: var(--oj-white);
+--surface-sunken: var(--oj-grey-100);
+--surface-lime: var(--oj-lime-100);
+--surface-lime-soft: var(--oj-lime-50);
+--surface-brand: var(--oj-green-700);
+--surface-brand-deep: var(--oj-green-900);
+--surface-brand-soft: var(--oj-green-50);
+--surface-accent: var(--oj-yellow-500);
+--surface-warm: var(--oj-brown-500);
+--surface-overlay: rgba(8,69,37,.48);
+
+--text-heading: var(--oj-green-900);
+--text-brand: var(--oj-green-700);
+--text-body: var(--oj-grey-600);
+--text-muted: var(--oj-grey-500);
+--text-faint: var(--oj-grey-400);
+--text-on-brand: var(--oj-white);
+--text-on-lime: var(--oj-green-900);
+--text-on-accent: var(--oj-green-900);
+--text-link: var(--oj-green-700);
+--text-link-hover: var(--oj-green-900);
+
+--border-subtle: var(--oj-grey-200);
+--border-strong: var(--oj-grey-300);
+--border-input: var(--oj-grey-300);
+--border-brand: var(--oj-green-700);
+--border-on-brand: rgba(255,255,255,.28);
+
+--color-success: var(--oj-green-700);
+--color-success-soft: var(--oj-green-50);
+--color-warning: var(--oj-yellow-500);
+--color-warning-soft: var(--oj-yellow-50);
+--color-danger: var(--oj-red-500);
+--color-danger-soft: var(--oj-red-50);
+--color-info: var(--oj-brown-500);
+--color-info-soft: var(--oj-brown-50);
+
+--focus-ring: 0 0 0 3px rgba(0,146,69,.28);
+}

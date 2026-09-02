@@ -1,0 +1,27 @@
+<!-- @dsCard group="Components" viewport="700x400" name="Feedback" subtitle="Toasts, modal dialog, empty state" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Feedback</title><link rel="stylesheet" href="../../styles.css">
+<script>window.OJUOJA_ICON_BASE="../../assets/icons";window.OJUOJA_ASSET_BASE="../../assets";</script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{padding:18px 20px;background:#fff}.row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}.col{display:flex;flex-direction:column;gap:14px}.lbl{font:600 10px/1 var(--font-body);letter-spacing:.09em;text-transform:uppercase;color:var(--text-faint)}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">const {Toast,Dialog,EmptyState,Button}=window.OjuojaDesignSystem_fd3102;
+function App(){return <div className="col">
+<div className="row" style={{alignItems:'flex-start'}}>
+<Toast title="Added to basket" message="2 × Ijebu garri from Mama T Stores" onClose={()=>{}}/>
+<Toast tone="info" icon="bike" title="Rider on the way" message="Arriving in about 20 minutes"/>
+</div>
+<div className="row" style={{alignItems:'flex-start'}}>
+<Toast tone="warning" title="Only 3 left" message="Order soon to keep your price"/>
+<Toast tone="danger" title="Payment failed" message="Your transfer did not go through" onClose={()=>{}}/>
+</div>
+<div className="row" style={{alignItems:'stretch',gap:18}}>
+<div style={{position:'relative',width:340,height:190,borderRadius:'var(--radius-lg)',overflow:'hidden',background:'var(--surface-card)'}}>
+<Dialog title="Remove this item?" onClose={()=>{}} footer={<><Button variant="ghost" size="sm">Keep it</Button><Button variant="danger" size="sm">Remove</Button></>}>Ijebu garri will be removed from your basket.</Dialog>
+</div>
+<div style={{width:300}}><EmptyState title="Your basket is empty" message="Start with what's trending in Ikorodu today." action={<Button size="sm" badgeIcon="shopping-basket">Shop Now!</Button>}/></div>
+</div>
+</div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);</script></body></html>

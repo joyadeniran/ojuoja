@@ -1,0 +1,22 @@
+<!-- @dsCard group="Components" viewport="700x400" name="Navigation" subtitle="Tabs, FAQ accordion, breadcrumb, pagination" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Navigation</title><link rel="stylesheet" href="../../styles.css">
+<script>window.OJUOJA_ICON_BASE="../../assets/icons";window.OJUOJA_ASSET_BASE="../../assets";</script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{padding:18px 20px;background:#fff}.row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}.col{display:flex;flex-direction:column;gap:14px}.lbl{font:600 10px/1 var(--font-body);letter-spacing:.09em;text-transform:uppercase;color:var(--text-faint)}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">const {Tabs,Accordion,Breadcrumb,Pagination}=window.OjuojaDesignSystem_fd3102;
+function App(){const[t,setT]=React.useState('All');const[t2,setT2]=React.useState('Vendors');const[p,setP]=React.useState(3);
+return <div className="col">
+<div className="row"><Tabs items={["All","Food & Snacks","Groceries","Drinks"]} value={t} onChange={setT}/></div>
+<Tabs variant="underline" items={["Vendors","Products","Reviews"]} value={t2} onChange={setT2}/>
+<div className="row"><Breadcrumb items={[{label:'Home',href:'#'},{label:'Groceries',href:'#'},{label:'Garri & staples'}]}/></div>
+<Accordion defaultOpen={0} items={[
+{q:'What is Ojuoja?',a:'A marketplace that puts verified Ikorodu vendors — kitchens, groceries, drinks — in one basket, delivered to you.'},
+{q:'How long does delivery take?',a:'Most orders inside Ikorodu arrive within 35 to 60 minutes.'},
+{q:'How do I become a vendor?',a:'Register your shop, upload a valid ID and your first ten products. Verification takes two working days.'}]}/>
+<div className="row"><Pagination page={p} pages={9} onChange={setP}/></div>
+</div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);</script></body></html>

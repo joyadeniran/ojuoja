@@ -1,0 +1,9 @@
+.oj-logo{display:inline-flex;align-items:center;line-height:0}
+.oj-logo img{display:block;height:100%;width:auto}
+.oj-logo--wordmark-fallback{font-family:var(--font-body);font-weight:800;letter-spacing:-.02em;color:var(--text-brand);line-height:1}
+.oj-icon{display:inline-block;flex:none;background-color:currentColor;-webkit-mask-position:center;mask-position:center;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-size:contain;mask-size:contain}
+.oj-pattern{position:relative;overflow:hidden}
+.oj-pattern--lime{background:var(--pattern-lime-stripe)}
+.oj-pattern--green{background:var(--pattern-green-stripe)}
+.oj-pattern--market{background:var(--pattern-market-bars);background-color:var(--oj-white)}
+.oj-pattern__inner{position:relative}

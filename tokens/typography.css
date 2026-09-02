@@ -1,0 +1,40 @@
+:root{
+/* Avigea sets every headline; Gilroy carries everything else.
+   Avigea is self-hosted (see tokens/fonts.css). Gilroy has not been
+   supplied, so its stack falls back to Poppins. */
+--font-display: Avigea, Georgia, "Times New Roman", serif;
+--font-body: Gilroy, Poppins, "Helvetica Neue", system-ui, sans-serif;
+--font-mono: "SFMono-Regular", ui-monospace, Menlo, monospace;
+
+--text-display-2xl: 80px;
+--text-display-xl: 64px;
+--text-display-lg: 52px;
+--text-display-md: 40px;
+--text-display-sm: 32px;
+--text-title-lg: 24px;
+--text-title-md: 20px;
+--text-title-sm: 18px;
+--text-body-lg: 17px;
+--text-body-md: 15px;
+--text-body-sm: 13px;
+--text-caption: 12px;
+--text-overline: 11px;
+
+--leading-display: 1.04;
+--leading-display-loose: 1.12;
+--leading-title: 1.25;
+--leading-body: 1.55;
+--leading-tight: 1.35;
+
+--tracking-display: -0.015em;
+--tracking-title: -0.005em;
+--tracking-body: 0em;
+--tracking-overline: 0.09em;
+
+--weight-display: 700;
+--weight-display-heavy: 900;
+--weight-regular: 400;
+--weight-medium: 500;
+--weight-semibold: 600;
+--weight-bold: 700;
+}

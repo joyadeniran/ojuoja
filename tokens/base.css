@@ -1,0 +1,10 @@
+/* Opt-in element defaults. Consumers get these for free by linking styles.css. */
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--surface-page);color:var(--text-body);font-family:var(--font-body);font-size:var(--text-body-md);line-height:var(--leading-body);-webkit-font-smoothing:antialiased;text-wrap:pretty}
+h1,h2,h3,h4{font-family:var(--font-display);color:var(--text-heading);font-weight:var(--weight-display);letter-spacing:var(--tracking-display);line-height:var(--leading-display);margin:0}
+h1{font-size:var(--text-display-lg)}h2{font-size:var(--text-display-md)}h3{font-size:var(--text-display-sm)}h4{font-size:var(--text-title-lg);line-height:var(--leading-title)}
+p{margin:0}
+a{color:var(--text-link);text-decoration:none;transition:color var(--duration-fast) var(--ease-out)}
+a:hover{color:var(--text-link-hover);text-decoration:underline;text-underline-offset:3px}
+button{font-family:inherit}
+::selection{background:var(--oj-lime-200);color:var(--oj-green-900)}
