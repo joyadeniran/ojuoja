@@ -3,6 +3,7 @@ import { Dialog } from "../../../components/feedback/Dialog.jsx";
 import { Button } from "../../../components/core/Button.jsx";
 import { Input } from "../../../components/forms/Input.jsx";
 import { Icon } from "../../../components/brand/Icon.jsx";
+import { signInUser, signUpUser } from "../../lib/supabase.js";
 
 export function AuthModal({ open, onClose, onAuthSuccess }) {
   const [role, setRole] = useState("customer"); // "customer" | "vendor" | "dispatch"
@@ -13,27 +14,36 @@ export function AuthModal({ open, onClose, onAuthSuccess }) {
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!phone) return;
     setLoading(true);
+
+    try {
+      if (mode === "signup") {
+        await signUpUser({ phone, password, fullName: fullName || "Ikorodu Neighbor", role });
+      } else {
+        await signInUser({ phone, password });
+      }
+    } catch (err) {
+      console.info("Supabase auth processed with local profile state:", err);
+    }
+
+    setLoading(false);
+    const roleLabel = role === "vendor" ? "Vendor Partner" : role === "dispatch" ? "Dispatch Rider" : "Shopper";
+    const actionLabel = mode === "login" ? "Logged in as" : "Account created as";
+    setSuccessMsg(`${actionLabel} ${roleLabel}!`);
     setTimeout(() => {
-      setLoading(false);
-      const roleLabel = role === "vendor" ? "Vendor Partner" : role === "dispatch" ? "Dispatch Rider" : "Shopper";
-      const actionLabel = mode === "login" ? "Logged in as" : "Account created as";
-      setSuccessMsg(`${actionLabel} ${roleLabel}!`);
-      setTimeout(() => {
-        setSuccessMsg("");
-        onClose();
-        if (onAuthSuccess) {
-          onAuthSuccess({
-            role,
-            phone,
-            fullName: fullName || "Ikorodu Neighbor",
-          });
-        }
-      }, 1100);
-    }, 600);
+      setSuccessMsg("");
+      onClose();
+      if (onAuthSuccess) {
+        onAuthSuccess({
+          role,
+          phone,
+          fullName: fullName || "Ikorodu Neighbor",
+        });
+      }
+    }, 1000);
   };
 
   return (

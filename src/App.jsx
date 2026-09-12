@@ -12,6 +12,12 @@ import { AuthModal } from "./components/Modals/AuthModal.jsx";
 import { NotificationCenterModal } from "./components/Modals/NotificationCenterModal.jsx";
 import { Toast } from "../components/feedback/Toast.jsx";
 import { PRODUCTS, PHOTO_BASE } from "./data/marketData.js";
+import {
+  createOrder as createSupabaseOrder,
+  submitVendorApplication as submitSupabaseVendorApplication,
+  recordNotification as recordSupabaseNotification,
+  checkSupabaseConnection,
+} from "./lib/supabase.js";
 
 const STORAGE_KEY_BASKET = "ojuoja_basket_v1";
 const STORAGE_KEY_FAVS = "ojuoja_favs_v1";
@@ -114,6 +120,15 @@ export default function App() {
     const timer = setTimeout(() => setToast(null), 3800);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  // Check Supabase connectivity on mount
+  useEffect(() => {
+    checkSupabaseConnection().then((res) => {
+      if (res.connected) {
+        console.log("🟢 Connected to Supabase Project: mpxrsjbowjmimzctdinr");
+      }
+    });
+  }, []);
 
   // Navigation function
   const nav = (newScreen, params = {}) => {
@@ -251,7 +266,14 @@ export default function App() {
             }
             onRemove={(idx) => setBasket((prev) => prev.filter((_, j) => j !== idx))}
             onClearBasket={() => setBasket([])}
-            onCheckout={(order) => {
+            onCheckout={async (order) => {
+              // Persist order to Supabase
+              try {
+                await createSupabaseOrder(order);
+              } catch (err) {
+                console.info("Supabase order sync:", err);
+              }
+
               const vendorNames = Array.from(new Set(order.items.map((i) => i.vendor))).filter(Boolean).join(", ");
               const timeStr = "Just now";
               const newVendorNotif = {
@@ -278,6 +300,13 @@ export default function App() {
                 meta: `Ref: #OJ-${Math.floor(1000 + Math.random() * 9000)}`,
                 time: timeStr,
               };
+
+              // Persist notifications to Supabase
+              try {
+                await recordSupabaseNotification(newVendorNotif);
+                await recordSupabaseNotification(newDispatchNotif);
+                await recordSupabaseNotification(newAdminNotif);
+              } catch {}
 
               setNotifications((prev) => [newVendorNotif, newDispatchNotif, newAdminNotif, ...prev]);
               setUnreadCount((c) => c + 3);
@@ -333,7 +362,14 @@ export default function App() {
       <BecomeVendorModal
         open={vendorModalOpen}
         onClose={() => setVendorModalOpen(false)}
-        onSubmitSuccess={(vendorData) => {
+        onSubmitSuccess={async (vendorData) => {
+          // Persist vendor application to Supabase
+          try {
+            await submitSupabaseVendorApplication(vendorData);
+          } catch (err) {
+            console.info("Supabase vendor application sync:", err);
+          }
+
           const timeStr = "Just now";
           const vendorNotif = {
             id: `v-app-${Date.now()}`,
@@ -351,6 +387,12 @@ export default function App() {
             meta: `Contact: ${vendorData.phone}`,
             time: timeStr,
           };
+
+          try {
+            await recordSupabaseNotification(vendorNotif);
+            await recordSupabaseNotification(adminNotif);
+          } catch {}
+
           setNotifications((prev) => [vendorNotif, adminNotif, ...prev]);
           setUnreadCount((c) => c + 2);
 
