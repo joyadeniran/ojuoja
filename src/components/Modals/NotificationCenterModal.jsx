@@ -97,14 +97,16 @@ export function NotificationCenterModal({ open, onClose, notifications = [], onC
                     gap: 6,
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <Badge tone={tone} icon={icon}>
-                        {roleName}
-                      </Badge>
-                      <strong style={{ fontSize: 14, color: "var(--text-heading)" }}>{item.title}</strong>
-                    </div>
-                    <span style={{ fontSize: 11, color: "var(--text-faint)" }}>{item.time || "Just now"}</span>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <Badge tone={tone} icon={icon}>
+                      {roleName}
+                    </Badge>
+                    <span style={{ fontSize: 11, color: "var(--text-faint)", whiteSpace: "nowrap" }}>
+                      {item.time || "Just now"}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-heading)", lineHeight: 1.35, marginTop: 2 }}>
+                    {item.title}
                   </div>
                   <p style={{ margin: 0, fontSize: 13, color: "var(--text-body)", lineHeight: 1.45 }}>
                     {item.message}
