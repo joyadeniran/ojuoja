@@ -46,8 +46,8 @@ export const VENDORS = [
     description: "Popular Sabo spot known for piping-hot samosas, spring rolls, spicy peppered meats, and party jollof.",
   },
   {
-    id: "ojuoja-fresh",
-    name: "Ojuoja Fresh",
+    id: "ojawa-fresh",
+    name: "Ojawa Fresh",
     area: "Agric",
     verified: true,
     rating: 4.8,
@@ -121,8 +121,8 @@ export const PRODUCTS = [
     name: "Bell peppers, mixed (1kg)",
     category: "groceries",
     price: 3200,
-    vendor: "Ojuoja Fresh",
-    vendorId: "ojuoja-fresh",
+    vendor: "Ojawa Fresh",
+    vendorId: "ojawa-fresh",
     area: "Agric",
     verified: true,
     rating: 4.7,
@@ -264,8 +264,8 @@ export const PRODUCTS = [
     name: "Premium Scotch Bonnet / Rodo (500g)",
     category: "groceries",
     price: 2100,
-    vendor: "Ojuoja Fresh",
-    vendorId: "ojuoja-fresh",
+    vendor: "Ojawa Fresh",
+    vendorId: "ojawa-fresh",
     area: "Agric",
     verified: true,
     rating: 4.7,
@@ -285,8 +285,8 @@ export const PRODUCTS = [
 
 export const FAQS = [
   {
-    q: "What is Ojuoja?",
-    a: "Ojuoja is an online marketplace that puts verified Ikorodu vendors — kitchens, groceries, drinks — in one basket and delivers to your door.",
+    q: "What is Ojawa?",
+    a: "Ojawa is an online marketplace that puts verified Ikorodu vendors — kitchens, groceries, drinks — in one basket and delivers to your door.",
   },
   {
     q: "How long does delivery take?",

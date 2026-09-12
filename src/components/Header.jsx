@@ -10,6 +10,10 @@ export function Header({
   active = "home",
   onOpenAbout,
   onOpenVendorModal,
+  onOpenAuth,
+  onOpenNotifications,
+  unreadNotificationsCount = 0,
+  currentUser = null,
   searchQuery = "",
   onSearchChange,
   onSearchSubmit,
@@ -61,7 +65,7 @@ export function Header({
             onNav("home");
           }}
           style={{ lineHeight: 0, textDecoration: "none", display: "flex", alignItems: "center" }}
-          aria-label="Ojuoja Homepage"
+          aria-label="Ojawa Homepage"
         >
           <Logo height={28} />
         </a>
@@ -216,7 +220,7 @@ export function Header({
             }}
             style={{ color: "var(--text-body)", textDecoration: "none" }}
           >
-            About Ojuoja
+            About Ojawa
           </a>
           <a
             href="#become-vendor"
@@ -302,18 +306,53 @@ export function Header({
             count={cartCount}
             onClick={() => onNav("basket")}
           />
-          <span
-            title="Ojuoja Marketplace pattern"
+          {/* Activity & Notifications (Vendors, Dispatch, Admin) */}
+          <IconButton
+            icon="bell"
+            variant="outline"
+            label="Activity & Notifications"
+            count={unreadNotificationsCount}
+            onClick={onOpenNotifications}
+            title="Vendors, Dispatch & Admin Notifications"
+          />
+
+          {/* Login or Sign Up Button */}
+          <button
+            type="button"
+            onClick={onOpenAuth}
             style={{
-              width: 38,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
               height: 38,
-              borderRadius: "var(--radius-sm)",
-              background: "var(--pattern-market-bars)",
-              backgroundColor: "#fff",
-              display: "inline-block",
+              padding: "0 14px",
+              borderRadius: "var(--radius-pill)",
+              border: "1px solid var(--border-subtle)",
+              background: "#fff",
+              color: "var(--text-heading)",
+              font: "600 13px/1 var(--font-body)",
+              cursor: "pointer",
+              transition: "var(--transition-control)",
               boxShadow: "var(--shadow-xs)",
             }}
-          />
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = "var(--border-brand)";
+              e.currentTarget.style.background = "var(--surface-brand-soft)";
+              e.currentTarget.style.color = "var(--text-brand)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = "var(--border-subtle)";
+              e.currentTarget.style.background = "#fff";
+              e.currentTarget.style.color = "var(--text-heading)";
+            }}
+            aria-label={currentUser ? `Account: ${currentUser.fullName}` : "Login or Signup"}
+            title={currentUser ? `Logged in: ${currentUser.fullName}` : "Login or Signup"}
+          >
+            <Icon name="user" size={16} />
+            <span className="oj-login-text">
+              {currentUser ? currentUser.fullName.split(" ")[0] : "Log In"}
+            </span>
+          </button>
 
           {/* Mobile Menu Button */}
           <button
@@ -430,7 +469,7 @@ export function Header({
               padding: "6px 0",
             }}
           >
-            About Ojuoja
+            About Ojawa
           </button>
           <button
             type="button"
@@ -450,6 +489,66 @@ export function Header({
           >
             Become a Vendor (Apply Now)
           </button>
+          <div style={{ borderTop: "1px solid var(--border-subtle)", margin: "4px 0" }} />
+          <button
+            type="button"
+            onClick={() => {
+              setMobileMenuOpen(false);
+              onOpenAuth();
+            }}
+            style={{
+              textAlign: "left",
+              border: 0,
+              background: "transparent",
+              font: "600 15px var(--font-body)",
+              color: "var(--text-heading)",
+              cursor: "pointer",
+              padding: "6px 0",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <Icon name="user" size={16} />
+            <span>{currentUser ? `Account (${currentUser.fullName})` : "Log In or Sign Up"}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMobileMenuOpen(false);
+              onOpenNotifications();
+            }}
+            style={{
+              textAlign: "left",
+              border: 0,
+              background: "transparent",
+              font: "600 15px var(--font-body)",
+              color: "var(--text-heading)",
+              cursor: "pointer",
+              padding: "6px 0",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <Icon name="bell" size={16} />
+            <span>Notifications (Vendors, Dispatch & Admin)</span>
+            {unreadNotificationsCount > 0 && (
+              <span
+                style={{
+                  background: "var(--color-danger)",
+                  color: "#fff",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  borderRadius: "var(--radius-pill)",
+                  padding: "1px 6px",
+                  marginLeft: "auto",
+                }}
+              >
+                {unreadNotificationsCount}
+              </span>
+            )}
+          </button>
         </div>
       )}
 
@@ -457,6 +556,9 @@ export function Header({
         @media (min-width: 860px) {
           .oj-desktop-nav { display: flex !important; }
           .oj-mobile-menu-btn { display: none !important; }
+        }
+        @media (max-width: 600px) {
+          .oj-login-text { display: none !important; }
         }
       `}</style>
     </header>

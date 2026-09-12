@@ -115,13 +115,15 @@ export function HomeScreen({ onNav, onAdd, onSelectProduct, onToggleFavourite, f
             }}
           >
             <img
-              src={PHOTO_BASE + "hero-basket-lime.png"}
-              alt="Fresh Ikorodu market produce"
+              src={PHOTO_BASE + "hero-jollof-hand.jpg"}
+              alt="Authentic Nigerian Jollof Rice in takeaway pack from verified Ikorodu kitchen"
               style={{
                 width: "100%",
-                maxWidth: 460,
+                maxWidth: 480,
+                borderRadius: "var(--radius-lg)",
                 display: "block",
-                filter: "drop-shadow(0 14px 28px rgba(8,69,37,0.12))",
+                boxShadow: "0 18px 36px rgba(8,69,37,0.16)",
+                border: "4px solid #ffffff",
               }}
             />
           </div>
@@ -150,7 +152,7 @@ export function HomeScreen({ onNav, onAdd, onSelectProduct, onToggleFavourite, f
           <div>
             <p style={{ fontSize: 16, color: "var(--text-muted)", maxWidth: "52ch", lineHeight: 1.6, margin: 0 }}>
               Explore new flavors, trends, and essentials from verified vendors across Ikorodu.
-              Every shop on Ojuoja is physically verified before opening for online orders.
+              Every shop on Ojawa is physically verified before opening for online orders.
             </p>
             <div style={{ marginTop: 22, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
               <Button badgeIcon="shopping-basket" onClick={() => onNav("category")}>

@@ -17,7 +17,7 @@ export function Logo({ variant = "full-color", mark = false, height = 28, classN
   const file = mark ? MARK_FILES[variant] : FILES[variant];
   return (
     <span className={`oj-logo ${className}`} style={{ height, ...style }} {...rest}>
-      <img src={`${assetBase()}/${file}`} alt="Ojuoja" />
+      <img src={`${assetBase()}/${file}`} alt="Ojawa" />
     </span>
   );
 }

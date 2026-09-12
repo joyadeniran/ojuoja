@@ -155,13 +155,13 @@ export function Footer({ onNav, onOpenAbout, onOpenVendorModal }) {
               }}
               style={{ color: "rgba(255,255,255,.9)", fontSize: 14, textDecoration: "none" }}
             >
-              The Story of Ojú Ọjà
+              The Story of Ojawa
             </a>
             <a
               href="#help"
               onClick={(e) => {
                 e.preventDefault();
-                alert("Ojuoja WhatsApp Support: 0800-OJUOJA-IKORODU (Available 7am - 8pm daily)");
+                alert("Ojawa WhatsApp Support: 0800-OJAWA-IKORODU (Available 7am - 8pm daily)");
               }}
               style={{ color: "rgba(255,255,255,.9)", fontSize: 14, textDecoration: "none" }}
             >
@@ -187,8 +187,8 @@ export function Footer({ onNav, onOpenAbout, onOpenVendorModal }) {
           color: "rgba(255,255,255,.8)",
         }}
       >
-        <span>© 2026 Ojuoja Marketplace. All Rights Reserved.</span>
-        <span>www.ojuoja.shop • Hand-verified Ikorodu Vendors</span>
+        <span>© 2026 Ojawa Marketplace. All Rights Reserved.</span>
+        <span>www.ojawa.shop • Hand-verified Ikorodu Vendors</span>
       </div>
 
       {/* White Wordmark Bleed Background */}
@@ -209,7 +209,7 @@ export function Footer({ onNav, onOpenAbout, onOpenVendorModal }) {
             width: "120%",
             maxWidth: 1300,
             marginBottom: -44,
-            opacity: 0.85,
+            opacity: 0.20,
             display: "block",
           }}
         />
