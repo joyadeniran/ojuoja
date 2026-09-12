@@ -16,10 +16,10 @@ export function Footer({ onNav, onOpenAbout, onOpenVendorModal }) {
         style={{
           maxWidth: "var(--layout-max)",
           margin: "0 auto",
-          padding: "0 32px",
+          padding: "0 var(--layout-gutter-resp, 16px)",
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: 40,
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))",
+          gap: 36,
         }}
       >
         {/* Brand Column */}
@@ -176,7 +176,7 @@ export function Footer({ onNav, onOpenAbout, onOpenVendorModal }) {
         style={{
           maxWidth: "var(--layout-max)",
           margin: "48px auto 0",
-          padding: "20px 32px 0",
+          padding: "20px var(--layout-gutter-resp, 16px) 0",
           borderTop: "1px solid var(--border-on-brand)",
           display: "flex",
           flexWrap: "wrap",
@@ -200,15 +200,16 @@ export function Footer({ onNav, onOpenAbout, onOpenVendorModal }) {
           overflow: "hidden",
           userSelect: "none",
           pointerEvents: "none",
+          maxWidth: "100%",
         }}
       >
         <img
           src="/assets/logo-white.svg"
           alt=""
           style={{
-            width: "120%",
-            maxWidth: 1300,
-            marginBottom: -44,
+            width: "100%",
+            maxWidth: 1100,
+            marginBottom: -24,
             opacity: 0.20,
             display: "block",
           }}

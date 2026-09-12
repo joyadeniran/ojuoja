@@ -22,8 +22,10 @@
 --layout-max-wide: 1320px;
 --layout-gutter: 24px;
 --layout-gutter-lg: 40px;
+--layout-gutter-resp: clamp(16px, 3.5vw, 32px);
 --layout-section-y: 96px;
 --layout-section-y-sm: 64px;
+--layout-section-y-resp: clamp(48px, 7vw, 96px);
 --layout-grid-gap: 24px;
 --layout-header-h: 76px;
 --control-h-sm: 34px;

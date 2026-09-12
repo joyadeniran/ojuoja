@@ -33,15 +33,15 @@ export function HomeScreen({ onNav, onAdd, onSelectProduct, onToggleFavourite, f
           style={{
             maxWidth: "var(--layout-max)",
             margin: "0 auto",
-            padding: "0 32px",
+            padding: "0 var(--layout-gutter-resp, 16px)",
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
             alignItems: "center",
-            minHeight: 520,
-            gap: 32,
+            minHeight: 460,
+            gap: 24,
           }}
         >
-          <div style={{ paddingTop: 64, paddingBottom: 64 }}>
+          <div style={{ paddingTop: "clamp(32px, 5vw, 64px)", paddingBottom: "clamp(24px, 4vw, 64px)" }}>
             <span
               style={{
                 display: "inline-block",
@@ -61,8 +61,8 @@ export function HomeScreen({ onNav, onAdd, onSelectProduct, onToggleFavourite, f
               style={{
                 fontFamily: "var(--font-display)",
                 fontWeight: 700,
-                fontSize: "clamp(36px, 5vw, 60px)",
-                lineHeight: 1.04,
+                fontSize: "clamp(32px, 5vw, 60px)",
+                lineHeight: 1.05,
                 letterSpacing: "-.015em",
                 color: "var(--oj-green-900)",
                 margin: 0,
@@ -84,7 +84,7 @@ export function HomeScreen({ onNav, onAdd, onSelectProduct, onToggleFavourite, f
               From hidden local gems to your daily essentials, discover the best of Ikorodu's
               vendors, delivered straight to you in 35–60 minutes.
             </p>
-            <div style={{ marginTop: 28, display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ marginTop: 28, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
               <Button
                 badgeIcon="shopping-basket"
                 size="lg"
@@ -131,12 +131,12 @@ export function HomeScreen({ onNav, onAdd, onSelectProduct, onToggleFavourite, f
       </PatternPanel>
 
       {/* Closer Than You Think Section */}
-      <section style={{ maxWidth: "var(--layout-max)", margin: "0 auto", padding: "96px 32px 0" }}>
+      <section style={{ maxWidth: "var(--layout-max)", margin: "0 auto", padding: "var(--layout-section-y-resp, 48px) var(--layout-gutter-resp, 16px) 0" }}>
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-            gap: 48,
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
+            gap: "clamp(24px, 4vw, 48px)",
             alignItems: "start",
           }}
         >
@@ -168,7 +168,7 @@ export function HomeScreen({ onNav, onAdd, onSelectProduct, onToggleFavourite, f
           style={{
             marginTop: 40,
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
             gap: 24,
           }}
         >
@@ -185,7 +185,7 @@ export function HomeScreen({ onNav, onAdd, onSelectProduct, onToggleFavourite, f
       </section>
 
       {/* Trending in Ikorodu Grid */}
-      <section style={{ maxWidth: "var(--layout-max)", margin: "0 auto", padding: "96px 32px 0" }}>
+      <section style={{ maxWidth: "var(--layout-max)", margin: "0 auto", padding: "var(--layout-section-y-resp, 48px) var(--layout-gutter-resp, 16px) 0" }}>
         <div
           style={{
             display: "flex",
@@ -205,7 +205,7 @@ export function HomeScreen({ onNav, onAdd, onSelectProduct, onToggleFavourite, f
               </>
             }
           />
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", maxWidth: "100%", overflowX: "auto" }}>
             {["All", "Food & Snacks", "Groceries", "Drinks"].map((tab) => (
               <Tag
                 key={tab}
@@ -222,7 +222,7 @@ export function HomeScreen({ onNav, onAdd, onSelectProduct, onToggleFavourite, f
           style={{
             marginTop: 36,
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 240px), 1fr))",
             gap: 24,
           }}
         >
@@ -254,7 +254,7 @@ export function HomeScreen({ onNav, onAdd, onSelectProduct, onToggleFavourite, f
       </section>
 
       {/* Deals Banner & Promo */}
-      <section style={{ maxWidth: "var(--layout-max)", margin: "0 auto", padding: "96px 32px 0", textAlign: "center" }}>
+      <section style={{ maxWidth: "var(--layout-max)", margin: "0 auto", padding: "var(--layout-section-y-resp, 48px) var(--layout-gutter-resp, 16px) 0", textAlign: "center" }}>
         <SectionHeading
           align="center"
           title={
@@ -274,7 +274,7 @@ export function HomeScreen({ onNav, onAdd, onSelectProduct, onToggleFavourite, f
       </section>
 
       {/* Decorative Promo Card */}
-      <div style={{ maxWidth: "var(--layout-max)", margin: "48px auto 0", padding: "0 32px" }}>
+      <div style={{ maxWidth: "var(--layout-max)", margin: "48px auto 0", padding: "0 var(--layout-gutter-resp, 16px)" }}>
         <PatternPanel
           variant="green"
           padded={false}
@@ -283,7 +283,7 @@ export function HomeScreen({ onNav, onAdd, onSelectProduct, onToggleFavourite, f
             display: "flex",
             justifyContent: "center",
             alignItems: "flex-end",
-            height: 340,
+            minHeight: 280,
             overflow: "hidden",
             position: "relative",
           }}
@@ -291,10 +291,12 @@ export function HomeScreen({ onNav, onAdd, onSelectProduct, onToggleFavourite, f
           <div
             style={{
               position: "absolute",
-              top: 32,
-              left: 32,
+              top: "clamp(16px, 4vw, 32px)",
+              left: "clamp(16px, 4vw, 32px)",
+              right: "clamp(16px, 4vw, 32px)",
               color: "#fff",
               maxWidth: 360,
+              zIndex: 2,
             }}
           >
             <span
@@ -311,7 +313,7 @@ export function HomeScreen({ onNav, onAdd, onSelectProduct, onToggleFavourite, f
             <h3
               style={{
                 fontFamily: "var(--font-display)",
-                fontSize: 28,
+                fontSize: "clamp(22px, 3.5vw, 28px)",
                 margin: "8px 0 0",
                 lineHeight: 1.15,
               }}
@@ -322,13 +324,13 @@ export function HomeScreen({ onNav, onAdd, onSelectProduct, onToggleFavourite, f
           <img
             src={PHOTO_BASE + "promo-basket-green.png"}
             alt="Market produce bundle"
-            style={{ height: "94%", objectFit: "contain" }}
+            style={{ maxHeight: 240, width: "auto", objectFit: "contain" }}
           />
         </PatternPanel>
       </div>
 
       {/* Verified Vendors Row */}
-      <section style={{ maxWidth: "var(--layout-max)", margin: "96px auto 0", padding: "0 32px" }}>
+      <section style={{ maxWidth: "var(--layout-max)", margin: "var(--layout-section-y-resp, 48px) auto 0", padding: "0 var(--layout-gutter-resp, 16px)" }}>
         <div
           style={{
             display: "flex",
@@ -357,7 +359,7 @@ export function HomeScreen({ onNav, onAdd, onSelectProduct, onToggleFavourite, f
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
             gap: 24,
           }}
         >
@@ -380,7 +382,7 @@ export function HomeScreen({ onNav, onAdd, onSelectProduct, onToggleFavourite, f
       </section>
 
       {/* Frequently Asked Questions */}
-      <section style={{ maxWidth: 840, margin: "0 auto", padding: "96px 32px 0" }}>
+      <section style={{ maxWidth: 840, margin: "0 auto", padding: "var(--layout-section-y-resp, 48px) var(--layout-gutter-resp, 16px) 0" }}>
         <SectionHeading
           align="center"
           title={

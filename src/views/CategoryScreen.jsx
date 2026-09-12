@@ -27,6 +27,7 @@ export function CategoryScreen({
   const [selectedArea, setSelectedArea] = useState(initialArea || "All");
   const [selectedCategory, setSelectedCategory] = useState(initialCategory || "all");
   const [sortBy, setSortBy] = useState("Most popular");
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   // Filter products
   const filteredProducts = useMemo(() => {
@@ -70,7 +71,7 @@ export function CategoryScreen({
     : "All Ikorodu Market Goods";
 
   return (
-    <main style={{ maxWidth: "var(--layout-max)", margin: "0 auto", padding: "32px 32px 96px" }}>
+    <main style={{ maxWidth: "var(--layout-max)", margin: "0 auto", padding: "var(--space-8) var(--layout-gutter-resp, 16px) var(--space-14)" }}>
       <Breadcrumb
         items={[
           {
@@ -91,7 +92,7 @@ export function CategoryScreen({
           display: "flex",
           alignItems: "flex-end",
           justifyContent: "space-between",
-          gap: 24,
+          gap: 16,
           flexWrap: "wrap",
         }}
       >
@@ -103,27 +104,47 @@ export function CategoryScreen({
               : "Hand-picked vegetables, provisions, snacks and drinks from verified Ikorodu stalls."
           }
         />
-        <div style={{ minWidth: 200 }}>
-          <Select
-            label="Sort by"
-            options={["Most popular", "Price: low to high", "Price: high to low", "Top rated"]}
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-          />
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="oj-mobile-filters-toggle"
+            onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}
+            style={{
+              display: "none",
+              alignItems: "center",
+              gap: 8,
+              height: 40,
+              padding: "0 14px",
+              borderRadius: "var(--radius-pill)",
+              border: "1px solid var(--border-subtle)",
+              background: mobileFiltersOpen ? "var(--surface-brand)" : "#fff",
+              color: mobileFiltersOpen ? "#fff" : "var(--text-heading)",
+              font: "600 13px var(--font-body)",
+              cursor: "pointer",
+            }}
+          >
+            <span>{mobileFiltersOpen ? "Hide Filters" : "Filters & Zones"}</span>
+          </button>
+          <div style={{ minWidth: 160 }}>
+            <Select
+              label="Sort by"
+              options={["Most popular", "Price: low to high", "Price: high to low", "Top rated"]}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
       <div
+        className="oj-category-layout"
         style={{
           marginTop: 36,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-          gap: 36,
-          alignItems: "start",
         }}
       >
         {/* Filters Sidebar */}
         <aside
+          className={`oj-category-sidebar ${mobileFiltersOpen ? "oj-category-sidebar--open" : ""}`}
           style={{
             maxWidth: 260,
             display: "flex",
@@ -269,7 +290,7 @@ export function CategoryScreen({
               Featured Vendor
             </div>
             <VendorCard
-              name="Ojuoja Fresh"
+              name="Ojawa Fresh"
               area="Agric"
               verified
               rating={4.8}
@@ -279,7 +300,7 @@ export function CategoryScreen({
         </aside>
 
         {/* Product Catalog Grid */}
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           {displayedProducts.length === 0 ? (
             <div style={{ padding: "40px 0" }}>
               <EmptyState
@@ -297,7 +318,7 @@ export function CategoryScreen({
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 240px), 1fr))",
                   gap: 24,
                 }}
               >
@@ -336,6 +357,36 @@ export function CategoryScreen({
           )}
         </div>
       </div>
+
+      <style>{`
+        .oj-category-layout {
+          display: grid;
+          grid-template-columns: 240px 1fr;
+          gap: 36px;
+          align-items: start;
+        }
+        @media (max-width: 860px) {
+          .oj-category-layout {
+            grid-template-columns: 1fr !important;
+            gap: 20px !important;
+          }
+          .oj-mobile-filters-toggle {
+            display: inline-flex !important;
+          }
+          .oj-category-sidebar {
+            display: none !important;
+            max-width: 100% !important;
+            position: static !important;
+            padding: 16px;
+            background: var(--surface-card);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-subtle);
+          }
+          .oj-category-sidebar--open {
+            display: flex !important;
+          }
+        }
+      `}</style>
     </main>
   );
 }

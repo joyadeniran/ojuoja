@@ -312,8 +312,9 @@ export default function App() {
         <div
           style={{
             position: "fixed",
-            right: 24,
-            bottom: 24,
+            right: 16,
+            bottom: 16,
+            maxWidth: "calc(100vw - 32px)",
             zIndex: 9999,
             animation: "oj-toast-in 200ms cubic-bezier(.2,.8,.3,1)",
           }}

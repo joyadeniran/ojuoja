@@ -46,14 +46,15 @@ export function Header({
       }}
     >
       <div
+        className="oj-header-inner"
         style={{
           maxWidth: "var(--layout-max-wide)",
           margin: "0 auto",
           height: "var(--layout-header-h)",
-          padding: "0 24px",
+          padding: "0 var(--layout-gutter-resp, 16px)",
           display: "flex",
           alignItems: "center",
-          gap: 20,
+          gap: 16,
           position: "relative",
         }}
       >
@@ -64,14 +65,14 @@ export function Header({
             e.preventDefault();
             onNav("home");
           }}
-          style={{ lineHeight: 0, textDecoration: "none", display: "flex", alignItems: "center" }}
+          style={{ lineHeight: 0, textDecoration: "none", display: "flex", alignItems: "center", flexShrink: 0 }}
           aria-label="Ojawa Homepage"
         >
           <Logo height={28} />
         </a>
 
         {/* Categories Dropdown Toggle */}
-        <div style={{ position: "relative" }}>
+        <div className="oj-categories-wrapper" style={{ position: "relative" }}>
           <button
             type="button"
             onClick={() => setCatMenuOpen(!catMenuOpen)}
@@ -238,9 +239,10 @@ export function Header({
           </a>
         </nav>
 
-        {/* Search Field */}
+        {/* Search Field (Desktop) */}
         <form
           onSubmit={handleSearch}
+          className="oj-header-search-desktop"
           style={{
             flex: 1,
             maxWidth: 380,
@@ -298,7 +300,7 @@ export function Header({
         </form>
 
         {/* Header Actions */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: "auto" }}>
           <IconButton
             icon="shopping-basket"
             variant="solid"
@@ -320,6 +322,7 @@ export function Header({
           <button
             type="button"
             onClick={onOpenAuth}
+            className="oj-login-btn"
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -377,16 +380,73 @@ export function Header({
         </div>
       </div>
 
+      {/* Mobile Search Bar (Only shown on mobile < 860px) */}
+      <div className="oj-header-search-mobile">
+        <form onSubmit={handleSearch} style={{ width: "100%" }}>
+          <div
+            style={{
+              position: "relative",
+              display: "flex",
+              alignItems: "center",
+              height: 38,
+              borderRadius: "var(--radius-pill)",
+              border: "1px solid var(--border-input)",
+              background: "var(--surface-sunken)",
+              padding: "0 14px",
+              gap: 10,
+            }}
+          >
+            <Icon name="search" size={15} style={{ color: "var(--text-faint)" }} />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder="Search akara, corn, garri..."
+              style={{
+                flex: 1,
+                border: 0,
+                background: "transparent",
+                font: "400 13px var(--font-body)",
+                color: "var(--text-heading)",
+                outline: "none",
+                width: "100%",
+              }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => onSearchChange("")}
+                style={{
+                  border: 0,
+                  background: "transparent",
+                  cursor: "pointer",
+                  color: "var(--text-faint)",
+                  padding: 2,
+                  display: "flex",
+                }}
+                aria-label="Clear search"
+              >
+                <Icon name="x" size={14} />
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
+
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div
+          className="oj-header-drawer"
           style={{
             borderTop: "1px solid var(--border-subtle)",
             background: "#fff",
-            padding: "16px 24px 24px",
+            padding: "16px var(--layout-gutter-resp, 16px) 32px",
             display: "flex",
             flexDirection: "column",
             gap: 14,
+            maxHeight: "calc(100vh - 120px)",
+            overflowY: "auto",
+            WebkitOverflowScrolling: "touch",
           }}
         >
           <div
@@ -553,9 +613,25 @@ export function Header({
       )}
 
       <style>{`
-        @media (min-width: 860px) {
+        @media (min-width: 861px) {
           .oj-desktop-nav { display: flex !important; }
           .oj-mobile-menu-btn { display: none !important; }
+          .oj-header-inner { height: var(--layout-header-h) !important; }
+          .oj-header-search-mobile { display: none !important; }
+          .oj-categories-wrapper { display: inline-flex !important; }
+          .oj-header-search-desktop { display: flex !important; }
+          .oj-login-btn { display: inline-flex !important; }
+        }
+        @media (max-width: 860px) {
+          .oj-desktop-nav { display: none !important; }
+          .oj-categories-wrapper { display: none !important; }
+          .oj-header-search-desktop { display: none !important; }
+          .oj-login-btn { display: none !important; }
+          .oj-header-inner { height: 60px !important; }
+          .oj-header-search-mobile {
+            display: block !important;
+            padding: 0 var(--layout-gutter-resp, 16px) 10px !important;
+          }
         }
         @media (max-width: 600px) {
           .oj-login-text { display: none !important; }

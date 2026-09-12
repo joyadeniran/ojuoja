@@ -16,7 +16,7 @@ export function VendorDirectoryScreen({ onNav, onOpenVendorModal }) {
   });
 
   return (
-    <main style={{ maxWidth: "var(--layout-max)", margin: "0 auto", padding: "32px 32px 96px" }}>
+    <main style={{ maxWidth: "var(--layout-max)", margin: "0 auto", padding: "var(--space-8) var(--layout-gutter-resp, 16px) var(--space-14)" }}>
       <Breadcrumb
         items={[
           {
@@ -37,7 +37,7 @@ export function VendorDirectoryScreen({ onNav, onOpenVendorModal }) {
           display: "flex",
           alignItems: "flex-end",
           justifyContent: "space-between",
-          gap: 24,
+          gap: 16,
           flexWrap: "wrap",
         }}
       >
@@ -61,7 +61,7 @@ export function VendorDirectoryScreen({ onNav, onOpenVendorModal }) {
       </div>
 
       {/* Area Filter Tags */}
-      <div style={{ marginTop: 28, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+      <div style={{ marginTop: 28, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", maxWidth: "100%", overflowX: "auto" }}>
         <span
           style={{
             font: "600 11px/1 var(--font-body)",
@@ -89,7 +89,7 @@ export function VendorDirectoryScreen({ onNav, onOpenVendorModal }) {
         style={{
           marginTop: 36,
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
           gap: 24,
         }}
       >

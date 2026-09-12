@@ -46,7 +46,7 @@ export function ProductScreen({
   const isFav = favourites.includes(p.id);
 
   return (
-    <main style={{ maxWidth: "var(--layout-max)", margin: "0 auto", padding: "32px 32px 96px" }}>
+    <main style={{ maxWidth: "var(--layout-max)", margin: "0 auto", padding: "var(--space-8) var(--layout-gutter-resp, 16px) var(--space-14)" }}>
       <Breadcrumb
         items={[
           {
@@ -73,8 +73,8 @@ export function ProductScreen({
         style={{
           marginTop: 28,
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-          gap: 56,
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))",
+          gap: "clamp(24px, 4vw, 56px)",
           alignItems: "start",
         }}
       >
@@ -88,7 +88,7 @@ export function ProductScreen({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              height: 420,
+              height: "clamp(260px, 50vw, 420px)",
               padding: 24,
               boxShadow: "var(--shadow-sm)",
             }}
@@ -108,7 +108,7 @@ export function ProductScreen({
 
           {/* Thumbnails Gallery */}
           {p.thumbnails && p.thumbnails.length > 1 && (
-            <div style={{ marginTop: 16, display: "flex", gap: 12 }}>
+            <div style={{ marginTop: 16, display: "flex", gap: 12, overflowX: "auto", maxWidth: "100%", paddingBottom: 4 }}>
               {p.thumbnails.map((thumb, idx) => (
                 <button
                   key={idx}
@@ -117,6 +117,7 @@ export function ProductScreen({
                   style={{
                     width: 76,
                     height: 76,
+                    flexShrink: 0,
                     borderRadius: "var(--radius-media)",
                     overflow: "hidden",
                     background: "var(--surface-card)",
@@ -209,31 +210,39 @@ export function ProductScreen({
           </p>
 
           <div
+            className="oj-product-actions"
             style={{
               marginTop: 28,
               display: "flex",
               alignItems: "center",
-              gap: 14,
+              gap: 12,
               flexWrap: "wrap",
             }}
           >
-            <QuantityStepper value={qty} onChange={setQty} unit={p.unit ? p.unit.split(" ")[0] : "qty"} />
-            <Button
-              badgeIcon="shopping-basket"
-              size="lg"
-              onClick={() => {
-                onAdd(p, qty);
-              }}
-            >
-              Add to Basket
-            </Button>
-            <Button
-              variant={isFav ? "primary" : "secondary"}
-              leadingIcon="heart"
-              onClick={() => onToggleFavourite(p.id)}
-            >
-              {isFav ? "Saved" : "Save"}
-            </Button>
+            <div className="oj-product-actions-qty">
+              <QuantityStepper value={qty} onChange={setQty} unit={p.unit ? p.unit.split(" ")[0] : "qty"} />
+            </div>
+            <div className="oj-product-actions-add" style={{ flex: "1 1 auto" }}>
+              <Button
+                badgeIcon="shopping-basket"
+                size="lg"
+                onClick={() => {
+                  onAdd(p, qty);
+                }}
+                style={{ width: "100%", justifyContent: "center" }}
+              >
+                Add to Basket
+              </Button>
+            </div>
+            <div className="oj-product-actions-save">
+              <Button
+                variant={isFav ? "primary" : "secondary"}
+                leadingIcon="heart"
+                onClick={() => onToggleFavourite(p.id)}
+              >
+                {isFav ? "Saved" : "Save"}
+              </Button>
+            </div>
           </div>
 
           <div style={{ marginTop: 22 }}>
@@ -286,7 +295,7 @@ export function ProductScreen({
                   />
                   <p style={{ marginTop: 14, fontSize: 14, color: "var(--text-body)", lineHeight: 1.6 }}>
                     {vendorObj.description ||
-                      "Trusted neighborhood vendor partnered with Ojuoja to deliver authentic fresh products straight to your door."}
+                      "Trusted neighborhood vendor partnered with Ojawa to deliver authentic fresh products straight to your door."}
                   </p>
                 </div>
               )}
@@ -332,12 +341,12 @@ export function ProductScreen({
       </div>
 
       {/* More From This Vendor Recommendation */}
-      <div style={{ marginTop: 88 }}>
+      <div style={{ marginTop: "var(--layout-section-y-resp, 48px)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 28 }}>
           <h2
             style={{
               fontFamily: "var(--font-display)",
-              fontSize: 28,
+              fontSize: "clamp(22px, 3.5vw, 28px)",
               color: "var(--text-heading)",
               margin: 0,
             }}
@@ -349,7 +358,7 @@ export function ProductScreen({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 240px), 1fr))",
             gap: 24,
           }}
         >
@@ -379,6 +388,22 @@ export function ProductScreen({
           ))}
         </div>
       </div>
+
+      <style>{`
+        @media (max-width: 480px) {
+          .oj-product-actions {
+            display: grid !important;
+            grid-template-columns: 1fr auto !important;
+            gap: 12px !important;
+          }
+          .oj-product-actions-qty { grid-column: 1; }
+          .oj-product-actions-save { grid-column: 2; }
+          .oj-product-actions-add {
+            grid-column: 1 / -1 !important;
+            width: 100% !important;
+          }
+        }
+      `}</style>
     </main>
   );
 }

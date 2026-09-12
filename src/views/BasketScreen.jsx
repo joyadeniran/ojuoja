@@ -60,7 +60,7 @@ export function BasketScreen({
   };
 
   return (
-    <main style={{ maxWidth: "var(--layout-max)", margin: "0 auto", padding: "32px 32px 96px" }}>
+    <main style={{ maxWidth: "var(--layout-max)", margin: "0 auto", padding: "var(--space-8) var(--layout-gutter-resp, 16px) var(--space-14)" }}>
       <Breadcrumb
         items={[
           {
@@ -105,8 +105,8 @@ export function BasketScreen({
           style={{
             marginTop: 36,
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-            gap: 48,
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))",
+            gap: "clamp(24px, 4vw, 48px)",
             alignItems: "start",
           }}
         >
@@ -127,7 +127,7 @@ export function BasketScreen({
             <div
               style={{
                 marginTop: 36,
-                padding: 24,
+                padding: "clamp(16px, 3vw, 24px)",
                 background: "var(--surface-card)",
                 borderRadius: "var(--radius-lg)",
                 border: "1px solid var(--border-subtle)",
@@ -229,7 +229,7 @@ export function BasketScreen({
           </div>
 
           {/* Right Column: Order Summary */}
-          <div style={{ position: "sticky", top: 96 }}>
+          <div className="oj-basket-summary" style={{ position: "sticky", top: 96 }}>
             <Card tone="flat">
               <div
                 style={{
@@ -497,6 +497,14 @@ export function BasketScreen({
           </div>
         </div>
       </Dialog>
+
+      <style>{`
+        @media (max-width: 860px) {
+          .oj-basket-summary {
+            position: static !important;
+          }
+        }
+      `}</style>
     </main>
   );
 }
