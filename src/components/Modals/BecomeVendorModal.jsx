@@ -41,7 +41,7 @@ export function BecomeVendorModal({ open, onClose, onSubmitSuccess }) {
     <Dialog
       open={open}
       onClose={onClose}
-      title="Become a Verified Ojuoja Vendor"
+      title="Become a Verified Ojawa Vendor"
       footer={
         submitted ? null : (
           <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", width: "100%" }}>

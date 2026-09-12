@@ -11,6 +11,7 @@ import { DeliveryNote } from "../../components/commerce/DeliveryNote.jsx";
 import { EmptyState } from "../../components/feedback/EmptyState.jsx";
 import { Dialog } from "../../components/feedback/Dialog.jsx";
 import { Badge } from "../../components/core/Badge.jsx";
+import { Icon } from "../../components/brand/Icon.jsx";
 import { AREAS } from "../data/marketData.js";
 
 const naira = (n) => "₦" + Number(n).toLocaleString("en-NG");
@@ -369,11 +370,9 @@ export function BasketScreen({
               alignItems: "center",
               justifyContent: "center",
               margin: "0 auto 16px",
-              fontSize: 28,
-              fontWeight: 700,
             }}
           >
-            🛵
+            <Icon name="bike" size={28} />
           </div>
           <h3
             style={{
@@ -383,23 +382,107 @@ export function BasketScreen({
               margin: "0 0 8px",
             }}
           >
-            Rider Dispatched!
+            Order Placed & Dispatched!
           </h3>
           <p
             style={{
               fontSize: 15,
               color: "var(--text-body)",
-              maxWidth: "38ch",
-              margin: "0 auto 16px",
+              maxWidth: "42ch",
+              margin: "0 auto 20px",
               lineHeight: 1.5,
             }}
           >
-            Your order of <strong>{naira(total)}</strong> has been sent to our verified vendors in Ikorodu.
-            A dispatch rider will call <strong>{phoneNumber}</strong> within a few minutes.
+            Your order of <strong>{naira(total)}</strong> is confirmed. All relevant parties have been notified in real time.
           </p>
+
+          {/* Tripartite Live Notifications Workflow */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, textAlign: "left", marginBottom: 20 }}>
+            {/* 1. Vendor Notification */}
+            <div
+              style={{
+                display: "flex",
+                gap: 12,
+                padding: "12px 14px",
+                background: "var(--surface-brand-soft)",
+                borderRadius: "var(--radius-md)",
+                border: "1px solid var(--oj-green-200)",
+              }}
+            >
+              <div style={{ color: "var(--text-brand)", marginTop: 2 }}>
+                <Icon name="store" size={18} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <strong style={{ fontSize: 13, color: "var(--oj-green-900)" }}>
+                    1. Vendor Notification
+                  </strong>
+                  <Badge tone="brand">Alerted</Badge>
+                </div>
+                <p style={{ margin: "3px 0 0", fontSize: 12, color: "var(--oj-green-800)", lineHeight: 1.4 }}>
+                  Kitchen/stall notified to prepare your items for immediate pickup.
+                </p>
+              </div>
+            </div>
+
+            {/* 2. Dispatch Notification */}
+            <div
+              style={{
+                display: "flex",
+                gap: 12,
+                padding: "12px 14px",
+                background: "var(--surface-lime)",
+                borderRadius: "var(--radius-md)",
+                border: "1px solid var(--border-subtle)",
+              }}
+            >
+              <div style={{ color: "var(--oj-green-900)", marginTop: 2 }}>
+                <Icon name="bike" size={18} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <strong style={{ fontSize: 13, color: "var(--oj-green-900)" }}>
+                    2. Dispatch Rider Notification
+                  </strong>
+                  <Badge tone="lime">Assigned</Badge>
+                </div>
+                <p style={{ margin: "3px 0 0", fontSize: 12, color: "var(--oj-green-900)", lineHeight: 1.4 }}>
+                  Nearest rider in <strong>{selectedArea}</strong> assigned. Will call <strong>{phoneNumber}</strong> upon pickup.
+                </p>
+              </div>
+            </div>
+
+            {/* 3. Admin Notification */}
+            <div
+              style={{
+                display: "flex",
+                gap: 12,
+                padding: "12px 14px",
+                background: "var(--surface-raised)",
+                borderRadius: "var(--radius-md)",
+                border: "1px solid var(--border-subtle)",
+              }}
+            >
+              <div style={{ color: "var(--text-heading)", marginTop: 2 }}>
+                <Icon name="shield-check" size={18} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <strong style={{ fontSize: 13, color: "var(--text-heading)" }}>
+                    3. Admin Operations Notification
+                  </strong>
+                  <Badge tone="neutral">Recorded</Badge>
+                </div>
+                <p style={{ margin: "3px 0 0", fontSize: 12, color: "var(--text-muted)", lineHeight: 1.4 }}>
+                  Ojawa operations logged payment ({payMethod === "transfer" ? "Bank Transfer" : payMethod === "cash" ? "Cash" : "Card"}) and delivery SLA (35–60 mins).
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div
             style={{
-              padding: "12px",
+              padding: "12px 14px",
               background: "var(--surface-card)",
               borderRadius: "var(--radius-md)",
               border: "1px solid var(--border-subtle)",
@@ -409,15 +492,7 @@ export function BasketScreen({
             }}
           >
             <div>
-              <strong>Delivery to:</strong> {streetAddress}, {selectedArea}, Ikorodu
-            </div>
-            <div style={{ marginTop: 4 }}>
-              <strong>Payment:</strong>{" "}
-              {payMethod === "transfer"
-                ? "Bank Transfer on Delivery"
-                : payMethod === "cash"
-                ? "Cash to Rider"
-                : "Debit Card / POS"}
+              <strong>Delivery Destination:</strong> {streetAddress}, {selectedArea}, Ikorodu
             </div>
           </div>
         </div>

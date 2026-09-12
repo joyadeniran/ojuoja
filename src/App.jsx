@@ -8,6 +8,8 @@ import { BasketScreen } from "./views/BasketScreen.jsx";
 import { VendorDirectoryScreen } from "./views/VendorDirectoryScreen.jsx";
 import { BecomeVendorModal } from "./components/Modals/BecomeVendorModal.jsx";
 import { AboutModal } from "./components/Modals/AboutModal.jsx";
+import { AuthModal } from "./components/Modals/AuthModal.jsx";
+import { NotificationCenterModal } from "./components/Modals/NotificationCenterModal.jsx";
 import { Toast } from "../components/feedback/Toast.jsx";
 import { PRODUCTS, PHOTO_BASE } from "./data/marketData.js";
 
@@ -26,10 +28,37 @@ const DEFAULT_BASKET = [
   {
     id: "prod-2",
     name: "Bell peppers, mixed (1kg)",
-    vendor: "Ojuoja Fresh",
+    vendor: "Ojawa Fresh",
     price: 3200,
     qty: 1,
     image: PHOTO_BASE + "prod-peppers.png",
+  },
+];
+
+const INITIAL_NOTIFICATIONS = [
+  {
+    id: "notif-1",
+    recipient: "vendor",
+    title: "Kitchen Order Prepared",
+    message: "Mama T Stores dispatched 2 items for Ita Elewa delivery.",
+    meta: "Prep SLA: 12 mins",
+    time: "3 mins ago",
+  },
+  {
+    id: "notif-2",
+    recipient: "dispatch",
+    title: "Rider Assigned (Ita Elewa)",
+    message: "Rider Segun picked up parcel at Sabo Market for delivery to Agric.",
+    meta: "Est. delivery: 28 mins",
+    time: "10 mins ago",
+  },
+  {
+    id: "notif-3",
+    recipient: "admin",
+    title: "Daily Operations Status",
+    message: "All 18 verified Ikorodu kitchens and grocery stalls online & active.",
+    meta: "Platform Health: 100%",
+    time: "35 mins ago",
   },
 ];
 
@@ -41,6 +70,11 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const [aboutModalOpen, setAboutModalOpen] = useState(false);
   const [vendorModalOpen, setVendorModalOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [notificationsModalOpen, setNotificationsModalOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
+  const [unreadCount, setUnreadCount] = useState(3);
 
   // Basket state with localStorage
   const [basket, setBasket] = useState(() => {
@@ -155,6 +189,13 @@ export default function App() {
         active={screen}
         onOpenAbout={() => setAboutModalOpen(true)}
         onOpenVendorModal={() => setVendorModalOpen(true)}
+        onOpenAuth={() => setAuthModalOpen(true)}
+        onOpenNotifications={() => {
+          setNotificationsModalOpen(true);
+          setUnreadCount(0);
+        }}
+        unreadNotificationsCount={unreadCount}
+        currentUser={currentUser}
         searchQuery={searchQuery}
         onSearchChange={(q) => {
           setSearchQuery(q);
@@ -210,14 +251,44 @@ export default function App() {
             }
             onRemove={(idx) => setBasket((prev) => prev.filter((_, j) => j !== idx))}
             onClearBasket={() => setBasket([])}
-            onCheckout={(order) =>
+            onCheckout={(order) => {
+              const vendorNames = Array.from(new Set(order.items.map((i) => i.vendor))).filter(Boolean).join(", ");
+              const timeStr = "Just now";
+              const newVendorNotif = {
+                id: `v-${Date.now()}`,
+                recipient: "vendor",
+                title: "Kitchen Order Alert",
+                message: `${order.items.length} item(s) ordered from ${vendorNames || "verified kitchens"}. Preparation started.`,
+                meta: `Total: ₦${order.total.toLocaleString("en-NG")} • ${order.phone}`,
+                time: timeStr,
+              };
+              const newDispatchNotif = {
+                id: `d-${Date.now()}`,
+                recipient: "dispatch",
+                title: "Dispatch Rider Assigned",
+                message: `Delivery assigned to zone rider for ${order.address}.`,
+                meta: `Customer: ${order.phone}`,
+                time: timeStr,
+              };
+              const newAdminNotif = {
+                id: `a-${Date.now()}`,
+                recipient: "admin",
+                title: "Operations Order Logged",
+                message: `Order of ₦${order.total.toLocaleString("en-NG")} confirmed via ${order.paymentMethod === "transfer" ? "Bank Transfer" : "Cash"}. SLA 35–60m active.`,
+                meta: `Ref: #OJ-${Math.floor(1000 + Math.random() * 9000)}`,
+                time: timeStr,
+              };
+
+              setNotifications((prev) => [newVendorNotif, newDispatchNotif, newAdminNotif, ...prev]);
+              setUnreadCount((c) => c + 3);
+
               setToast({
-                tone: "info",
+                tone: "success",
                 icon: "bike",
-                title: "Order confirmed!",
-                message: `Rider assigned for delivery to ${order.address}.`,
-              })
-            }
+                title: "Order & Dispatch Active!",
+                message: `Vendor, dispatch rider & ops notified for ${order.address}.`,
+              });
+            }}
           />
         )}
 
@@ -262,12 +333,56 @@ export default function App() {
         open={vendorModalOpen}
         onClose={() => setVendorModalOpen(false)}
         onSubmitSuccess={(vendorData) => {
+          const timeStr = "Just now";
+          const vendorNotif = {
+            id: `v-app-${Date.now()}`,
+            recipient: "vendor",
+            title: "Store Application Submitted",
+            message: `${vendorData.shopName} queued for physical onboarding inspection.`,
+            meta: `Zone: ${vendorData.area}`,
+            time: timeStr,
+          };
+          const adminNotif = {
+            id: `a-app-${Date.now()}`,
+            recipient: "admin",
+            title: "New Vendor Application",
+            message: `${vendorData.shopName} applied for verification in ${vendorData.area}.`,
+            meta: `Contact: ${vendorData.phone}`,
+            time: timeStr,
+          };
+          setNotifications((prev) => [vendorNotif, adminNotif, ...prev]);
+          setUnreadCount((c) => c + 2);
+
           setToast({
             tone: "success",
             icon: "store",
             title: "Application received",
             message: `${vendorData.shopName} recorded for verification in ${vendorData.area}.`,
           });
+        }}
+      />
+
+      <AuthModal
+        open={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        onAuthSuccess={(user) => {
+          setCurrentUser(user);
+          setToast({
+            tone: "success",
+            icon: "user",
+            title: `Welcome, ${user.fullName}!`,
+            message: `Signed in as ${user.role === "vendor" ? "Vendor Partner" : user.role === "dispatch" ? "Dispatch Rider" : "Shopper"}.`,
+          });
+        }}
+      />
+
+      <NotificationCenterModal
+        open={notificationsModalOpen}
+        onClose={() => setNotificationsModalOpen(false)}
+        notifications={notifications}
+        onClear={() => {
+          setNotifications([]);
+          setUnreadCount(0);
         }}
       />
 

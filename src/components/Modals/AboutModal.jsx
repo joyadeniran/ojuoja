@@ -8,7 +8,7 @@ export function AboutModal({ open, onClose, onBrowseVendors }) {
     <Dialog
       open={open}
       onClose={onClose}
-      title="The Story of Ojú Ọjà"
+      title="The Story of Ojawa"
       footer={
         <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
           <span style={{ fontSize: 13, color: "var(--text-faint)" }}>Ikorodu, Lagos State</span>
@@ -50,11 +50,11 @@ export function AboutModal({ open, onClose, onBrowseVendors }) {
 
         <div>
           <h4 style={{ margin: "0 0 6px", color: "var(--text-heading)", fontSize: 15 }}>
-            What does "Ojuoja" mean?
+            What does "Ojawa" mean?
           </h4>
           <p style={{ margin: 0 }}>
-            "Ojuoja" is Yoruba — <em>ojú ọjà</em>, meaning <strong>"the face of the market"</strong>.
-            The logo mark retains the traditional Yoruba sub-dot under the <strong>ọ</strong> and paints it brand yellow;
+            "Ojawa" is Yoruba — <em>ọjà wá</em>, meaning <strong>"the market has arrived"</strong>.
+            The logo mark retains the traditional Yoruba sub-dot on the <strong>Ọ</strong> and paints it brand yellow;
             that dot is the brand's smallest and proudest signature.
           </p>
         </div>
@@ -64,7 +64,7 @@ export function AboutModal({ open, onClose, onBrowseVendors }) {
             Checked by Hand
           </h4>
           <p style={{ margin: 0 }}>
-            No random drop-shippers or unverified listings. Every vendor on Ojuoja is physically inspected in their
+            No random drop-shippers or unverified listings. Every vendor on Ojawa is physically inspected in their
             Ikorodu market stall or kitchen before their products go live. When you buy sweet corn from Mama T or small
             chops from Iya Basira, you know exactly where it's coming from.
           </p>

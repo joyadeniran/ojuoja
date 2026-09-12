@@ -102,6 +102,7 @@ export function VendorDirectoryScreen({ onNav, onOpenVendorModal }) {
                 verified={vendor.verified}
                 rating={vendor.rating}
                 deliveryMins={vendor.deliveryMins}
+                style={{ border: "none", padding: 0, background: "transparent" }}
               />
               <p
                 style={{
@@ -177,7 +178,7 @@ export function VendorDirectoryScreen({ onNav, onOpenVendorModal }) {
           </p>
         </div>
         <Button badgeIcon="store" size="lg" onClick={onOpenVendorModal}>
-          Become an Ojuoja Vendor!
+          Become an Ojawa Vendor!
         </Button>
       </div>
     </main>
