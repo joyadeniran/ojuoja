@@ -230,6 +230,27 @@ export async function signInUser({ email, phone, password }) {
   }
 }
 
+export async function signInWithGoogle() {
+  const redirectTo =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/`
+      : "https://ojuoja.vercel.app/";
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo,
+      queryParams: {
+        access_type: "offline",
+        prompt: "consent",
+      },
+    },
+  });
+
+  if (error) return { success: false, error: error.message };
+  return { success: true, data };
+}
+
 export async function signOutUser() {
   try {
     await supabase.auth.signOut();
