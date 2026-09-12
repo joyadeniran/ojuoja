@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Header } from "./components/Header.jsx";
 import { Footer } from "./components/Footer.jsx";
 import { HomeScreen } from "./views/HomeScreen.jsx";
@@ -17,6 +17,10 @@ import {
   submitVendorApplication as submitSupabaseVendorApplication,
   recordNotification as recordSupabaseNotification,
   checkSupabaseConnection,
+  onAuthChange,
+  getProfile,
+  buildUserObject,
+  signOutUser,
 } from "./lib/supabase.js";
 
 const STORAGE_KEY_BASKET = "ojuoja_basket_v1";
@@ -77,6 +81,7 @@ export default function App() {
   const [aboutModalOpen, setAboutModalOpen] = useState(false);
   const [vendorModalOpen, setVendorModalOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState("login");
   const [notificationsModalOpen, setNotificationsModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
@@ -129,6 +134,43 @@ export default function App() {
       }
     });
   }, []);
+
+  // ── Auth state listener ────────────────────────────────────────────────────
+  // Handles: initial session restore, post-OAuth redirect, sign-out,
+  // and PASSWORD_RECOVERY (when user clicks the reset-password email link).
+  useEffect(() => {
+    const unsubscribe = onAuthChange(async (event, session) => {
+      if (event === "PASSWORD_RECOVERY") {
+        // User arrived via password-reset link — open the set-new-password modal
+        setAuthModalMode("reset-update");
+        setAuthModalOpen(true);
+        return;
+      }
+
+      if (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") {
+        if (session?.user) {
+          const profile = await getProfile(session.user.id);
+          const user = buildUserObject(session, profile);
+          setCurrentUser(user);
+        } else {
+          setCurrentUser(null);
+        }
+      }
+
+      if (event === "SIGNED_OUT") {
+        setCurrentUser(null);
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // ── Sign-out handler ───────────────────────────────────────────────────────
+  const handleSignOut = async () => {
+    await signOutUser();
+    setCurrentUser(null);
+    setToast({ tone: "info", icon: "user", title: "Signed out", message: "See you soon!" });
+  };
 
   // Navigation function
   const nav = (newScreen, params = {}) => {
@@ -204,7 +246,11 @@ export default function App() {
         active={screen}
         onOpenAbout={() => setAboutModalOpen(true)}
         onOpenVendorModal={() => setVendorModalOpen(true)}
-        onOpenAuth={() => setAuthModalOpen(true)}
+        onOpenAuth={() => {
+          setAuthModalMode("login");
+          setAuthModalOpen(true);
+        }}
+        onSignOut={handleSignOut}
         onOpenNotifications={() => {
           setNotificationsModalOpen(true);
           setUnreadCount(0);
@@ -267,9 +313,9 @@ export default function App() {
             onRemove={(idx) => setBasket((prev) => prev.filter((_, j) => j !== idx))}
             onClearBasket={() => setBasket([])}
             onCheckout={async (order) => {
-              // Persist order to Supabase
+              // Persist order to Supabase (attach customer_id if logged in)
               try {
-                await createSupabaseOrder(order);
+                await createSupabaseOrder(order, currentUser?.id || null);
               } catch (err) {
                 console.info("Supabase order sync:", err);
               }
@@ -365,7 +411,7 @@ export default function App() {
         onSubmitSuccess={async (vendorData) => {
           // Persist vendor application to Supabase
           try {
-            await submitSupabaseVendorApplication(vendorData);
+            await submitSupabaseVendorApplication(vendorData, currentUser?.id || null);
           } catch (err) {
             console.info("Supabase vendor application sync:", err);
           }
@@ -408,14 +454,18 @@ export default function App() {
       <AuthModal
         open={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
+        initialMode={authModalMode}
         onAuthSuccess={(user) => {
-          setCurrentUser(user);
-          setToast({
-            tone: "success",
-            icon: "user",
-            title: `Welcome, ${user.fullName}!`,
-            message: `Signed in as ${user.role === "vendor" ? "Vendor Partner" : user.role === "dispatch" ? "Dispatch Rider" : "Shopper"}.`,
-          });
+          // Profile will be set by onAuthStateChange — this is a secondary callback
+          if (user) {
+            setToast({
+              tone: "success",
+              icon: "user",
+              title: `Welcome!`,
+              message: `Signed in to Ojawa Marketplace.`,
+            });
+          }
+          setAuthModalOpen(false);
         }}
       />
 

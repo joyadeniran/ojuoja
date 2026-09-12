@@ -11,6 +11,7 @@ export function Header({
   onOpenAbout,
   onOpenVendorModal,
   onOpenAuth,
+  onSignOut,
   onOpenNotifications,
   unreadNotificationsCount = 0,
   currentUser = null,
@@ -20,6 +21,7 @@ export function Header({
 }) {
   const [catMenuOpen, setCatMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const handleCategoryClick = (catId) => {
     setCatMenuOpen(false);
@@ -318,44 +320,160 @@ export function Header({
             title="Vendors, Dispatch & Admin Notifications"
           />
 
-          {/* Login or Sign Up Button */}
-          <button
-            type="button"
-            onClick={onOpenAuth}
-            className="oj-login-btn"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              height: 38,
-              padding: "0 14px",
-              borderRadius: "var(--radius-pill)",
-              border: "1px solid var(--border-subtle)",
-              background: "#fff",
-              color: "var(--text-heading)",
-              font: "600 13px/1 var(--font-body)",
-              cursor: "pointer",
-              transition: "var(--transition-control)",
-              boxShadow: "var(--shadow-xs)",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = "var(--border-brand)";
-              e.currentTarget.style.background = "var(--surface-brand-soft)";
-              e.currentTarget.style.color = "var(--text-brand)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = "var(--border-subtle)";
-              e.currentTarget.style.background = "#fff";
-              e.currentTarget.style.color = "var(--text-heading)";
-            }}
-            aria-label={currentUser ? `Account: ${currentUser.fullName}` : "Login or Signup"}
-            title={currentUser ? `Logged in: ${currentUser.fullName}` : "Login or Signup"}
-          >
-            <Icon name="user" size={16} />
-            <span className="oj-login-text">
-              {currentUser ? currentUser.fullName.split(" ")[0] : "Log In"}
-            </span>
-          </button>
+          {/* Login / User Account Button */}
+          {currentUser ? (
+            /* ─── Logged-in user dropdown ─── */
+            <div style={{ position: "relative" }}>
+              <button
+                type="button"
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                className="oj-login-btn"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  height: 38,
+                  padding: "0 14px",
+                  borderRadius: "var(--radius-pill)",
+                  border: "1px solid var(--border-brand)",
+                  background: "var(--surface-brand-soft)",
+                  color: "var(--text-brand)",
+                  font: "600 13px/1 var(--font-body)",
+                  cursor: "pointer",
+                  transition: "var(--transition-control)",
+                  boxShadow: "var(--shadow-xs)",
+                }}
+                aria-label={`Account: ${currentUser.fullName}`}
+              >
+                {currentUser.avatarUrl ? (
+                  <img
+                    src={currentUser.avatarUrl}
+                    alt=""
+                    style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover" }}
+                  />
+                ) : (
+                  <Icon name="user" size={16} />
+                )}
+                <span className="oj-login-text">{currentUser.fullName.split(" ")[0]}</span>
+                <Icon
+                  name="chevron-down"
+                  size={13}
+                  style={{ transform: userMenuOpen ? "rotate(180deg)" : "none", transition: "transform 180ms ease" }}
+                />
+              </button>
+
+              {userMenuOpen && (
+                <>
+                  <div
+                    onClick={() => setUserMenuOpen(false)}
+                    style={{ position: "fixed", inset: 0, zIndex: 45 }}
+                  />
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 46,
+                      right: 0,
+                      zIndex: 50,
+                      background: "#fff",
+                      borderRadius: "var(--radius-md)",
+                      border: "1px solid var(--border-subtle)",
+                      boxShadow: "var(--shadow-lg)",
+                      minWidth: 200,
+                      padding: "8px 0",
+                    }}
+                  >
+                    <div style={{ padding: "10px 16px 8px", borderBottom: "1px solid var(--border-subtle)" }}>
+                      <div style={{ font: "600 13px var(--font-body)", color: "var(--text-heading)" }}>
+                        {currentUser.fullName}
+                      </div>
+                      <div style={{ font: "400 12px var(--font-body)", color: "var(--text-muted)", marginTop: 2 }}>
+                        {currentUser.email || currentUser.phone}
+                      </div>
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          marginTop: 6,
+                          padding: "2px 8px",
+                          borderRadius: "var(--radius-pill)",
+                          background: "var(--surface-lime)",
+                          color: "var(--oj-green-900)",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          textTransform: "capitalize",
+                        }}
+                      >
+                        <Icon name={currentUser.role === "vendor" ? "store" : currentUser.role === "dispatch" ? "bike" : "user"} size={11} />
+                        {currentUser.role}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        if (onSignOut) onSignOut();
+                      }}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "10px 16px",
+                        background: "transparent",
+                        border: 0,
+                        font: "500 14px/1 var(--font-body)",
+                        color: "var(--color-danger, #dc2626)",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "#fef2f2")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    >
+                      <Icon name="log-out" size={14} />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            /* ─── Guest login button ─── */
+            <button
+              type="button"
+              onClick={onOpenAuth}
+              className="oj-login-btn"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                height: 38,
+                padding: "0 14px",
+                borderRadius: "var(--radius-pill)",
+                border: "1px solid var(--border-subtle)",
+                background: "#fff",
+                color: "var(--text-heading)",
+                font: "600 13px/1 var(--font-body)",
+                cursor: "pointer",
+                transition: "var(--transition-control)",
+                boxShadow: "var(--shadow-xs)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "var(--border-brand)";
+                e.currentTarget.style.background = "var(--surface-brand-soft)";
+                e.currentTarget.style.color = "var(--text-brand)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "var(--border-subtle)";
+                e.currentTarget.style.background = "#fff";
+                e.currentTarget.style.color = "var(--text-heading)";
+              }}
+              aria-label="Login or Signup"
+            >
+              <Icon name="user" size={16} />
+              <span className="oj-login-text">Log In</span>
+            </button>
+          )}
 
           {/* Mobile Menu Button */}
           <button
@@ -554,14 +672,18 @@ export function Header({
             type="button"
             onClick={() => {
               setMobileMenuOpen(false);
-              onOpenAuth();
+              if (currentUser) {
+                if (onSignOut) onSignOut();
+              } else {
+                onOpenAuth();
+              }
             }}
             style={{
               textAlign: "left",
               border: 0,
               background: "transparent",
               font: "600 15px var(--font-body)",
-              color: "var(--text-heading)",
+              color: currentUser ? "var(--color-danger, #dc2626)" : "var(--text-heading)",
               cursor: "pointer",
               padding: "6px 0",
               display: "flex",
@@ -569,8 +691,8 @@ export function Header({
               gap: 8,
             }}
           >
-            <Icon name="user" size={16} />
-            <span>{currentUser ? `Account (${currentUser.fullName})` : "Log In or Sign Up"}</span>
+            <Icon name={currentUser ? "log-out" : "user"} size={16} />
+            <span>{currentUser ? `Sign Out (${currentUser.fullName.split(" ")[0]})` : "Log In or Sign Up"}</span>
           </button>
           <button
             type="button"
