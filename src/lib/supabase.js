@@ -400,3 +400,214 @@ export async function recordNotification(notifPayload) {
     return { success: false, error: err.message };
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DASHBOARD DATA HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+
+/** Admin: platform-wide aggregate statistics (via platform_stats view) */
+export async function getPlatformStats() {
+  const { data, error } = await supabase.from("platform_stats").select("*").single();
+  if (error) {
+    // Fallback counts using direct queries if view not yet created
+    const [usersRes, ordersRes, vendorsRes, appsRes] = await Promise.all([
+      supabase.from("profiles").select("id", { count: "exact", head: true }),
+      supabase.from("orders").select("id, total", { count: "exact" }),
+      supabase.from("vendors").select("id", { count: "exact", head: true }),
+      supabase.from("vendor_applications").select("id", { count: "exact", head: true }).eq("status", "under_review"),
+    ]);
+    const revenue = (ordersRes.data || []).reduce((s, o) => s + (o.total || 0), 0);
+    return {
+      total_users: usersRes.count || 0,
+      total_vendors: vendorsRes.count || 0,
+      total_orders: ordersRes.count || 0,
+      total_revenue: revenue,
+      pending_applications: appsRes.count || 0,
+      verified_vendors: 0,
+      pending_orders: 0,
+    };
+  }
+  return data;
+}
+
+/** Admin: fetch all user profiles, ordered by creation date */
+export async function getAllProfiles() {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) return [];
+  return data || [];
+}
+
+/** Admin: update a user's role */
+export async function updateProfileRole(userId, role) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .update({ role, updated_at: new Date().toISOString() })
+    .eq("id", userId)
+    .select()
+    .single();
+  if (error) return { success: false, error: error.message };
+  return { success: true, data };
+}
+
+/** Admin: fetch all orders across the platform */
+export async function getAllOrders({ limit = 50, status = null } = {}) {
+  let query = supabase
+    .from("orders")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (status) query = query.eq("status", status);
+  const { data, error } = await query;
+  if (error) return [];
+  return data || [];
+}
+
+/** Admin: update an order's status */
+export async function updateOrderStatus(orderId, status) {
+  const { data, error } = await supabase
+    .from("orders")
+    .update({ status })
+    .eq("id", orderId)
+    .select()
+    .single();
+  if (error) return { success: false, error: error.message };
+  return { success: true, data };
+}
+
+/** Admin: fetch all vendor applications */
+export async function getAllVendorApplications() {
+  const { data, error } = await supabase
+    .from("vendor_applications")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) return [];
+  return data || [];
+}
+
+/** Admin: approve or reject a vendor application */
+export async function updateApplicationStatus(appId, status, notes = "") {
+  const { data, error } = await supabase
+    .from("vendor_applications")
+    .update({ status, notes })
+    .eq("id", appId)
+    .select()
+    .single();
+  if (error) return { success: false, error: error.message };
+  return { success: true, data };
+}
+
+// ── Vendor ────────────────────────────────────────────────────────────────────
+
+/**
+ * Vendor: fetch orders that contain items from this vendor's store.
+ * Since items is a JSONB array, we use contains filtering.
+ */
+export async function getVendorOrders(vendorName) {
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) return [];
+  // Filter client-side: orders where at least one item.vendor === vendorName
+  return (data || []).filter((order) =>
+    (order.items || []).some((item) =>
+      (item.vendor || "").toLowerCase() === vendorName.toLowerCase()
+    )
+  );
+}
+
+/** Vendor: compute quick stats from their orders */
+export function computeVendorStats(orders, vendorName) {
+  const myOrders = orders.filter((o) =>
+    (o.items || []).some((item) => (item.vendor || "").toLowerCase() === vendorName.toLowerCase())
+  );
+  const revenue = myOrders.reduce((sum, o) => {
+    const vendorItems = (o.items || []).filter(
+      (item) => (item.vendor || "").toLowerCase() === vendorName.toLowerCase()
+    );
+    return sum + vendorItems.reduce((s, i) => s + (i.price || 0) * (i.qty || 1), 0);
+  }, 0);
+  const productCounts = {};
+  myOrders.forEach((o) => {
+    (o.items || [])
+      .filter((item) => (item.vendor || "").toLowerCase() === vendorName.toLowerCase())
+      .forEach((item) => {
+        productCounts[item.name] = (productCounts[item.name] || 0) + (item.qty || 1);
+      });
+  });
+  const topProducts = Object.entries(productCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([name, count]) => ({ name, count }));
+
+  return {
+    totalOrders: myOrders.length,
+    totalRevenue: revenue,
+    avgOrderValue: myOrders.length ? Math.round(revenue / myOrders.length) : 0,
+    topProducts,
+    pendingOrders: myOrders.filter((o) => o.status === "pending").length,
+    completedOrders: myOrders.filter((o) => o.status === "completed").length,
+  };
+}
+
+/** Vendor: get or upsert their store settings */
+export async function getVendorStoreSettings(vendorId) {
+  const { data } = await supabase
+    .from("vendor_store_settings")
+    .select("*")
+    .eq("vendor_id", vendorId)
+    .single();
+  return data;
+}
+
+export async function updateVendorStoreSettings(vendorId, settings) {
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from("vendor_store_settings")
+    .upsert({
+      vendor_id: vendorId,
+      owner_id: user?.id,
+      ...settings,
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+  if (error) return { success: false, error: error.message };
+  return { success: true, data };
+}
+
+// ── Customer ──────────────────────────────────────────────────────────────────
+
+/** Customer: fetch their own order history */
+export async function getMyOrders() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("customer_id", user.id)
+    .order("created_at", { ascending: false });
+  if (error) return [];
+  return data || [];
+}
+
+/** Customer: update their own profile (name, phone) */
+export async function updateMyProfile(updates) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Not authenticated" };
+  const { data, error } = await supabase
+    .from("profiles")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", user.id)
+    .select()
+    .single();
+  if (error) return { success: false, error: error.message };
+  return { success: true, data };
+}
+

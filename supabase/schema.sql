@@ -232,5 +232,103 @@ VALUES
   ('admin', 'Daily Operations Status', 'All 18 verified Ikorodu kitchens and grocery stalls online & active.', 'Platform Health: 100%', NOW() - INTERVAL '35 minutes')
 ON CONFLICT DO NOTHING;
 
+-- ==============================================================================
+-- ROLE HELPER FUNCTIONS (SECURITY DEFINER — bypasses RLS for the check itself)
+-- ==============================================================================
 
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role = 'admin'
+  );
+$$;
 
+CREATE OR REPLACE FUNCTION public.is_vendor()
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role IN ('vendor', 'admin')
+  );
+$$;
+
+-- ==============================================================================
+-- REFINED RLS — ADMIN OVERRIDES
+-- ==============================================================================
+
+-- profiles: admins can read ALL profiles (for user management)
+DROP POLICY IF EXISTS "Admins can read all profiles" ON public.profiles;
+CREATE POLICY "Admins can read all profiles"
+  ON public.profiles FOR SELECT USING (public.is_admin() OR auth.uid() = id);
+
+-- profiles: admins can UPDATE any profile (role promotion)
+DROP POLICY IF EXISTS "Admins can update any profile" ON public.profiles;
+CREATE POLICY "Admins can update any profile"
+  ON public.profiles FOR UPDATE USING (public.is_admin() OR auth.uid() = id);
+
+-- orders: admins can view ALL orders
+DROP POLICY IF EXISTS "Admins can view all orders" ON public.orders;
+CREATE POLICY "Admins can view all orders"
+  ON public.orders FOR SELECT USING (public.is_admin() OR (auth.uid() IS NOT NULL AND auth.uid() = customer_id));
+
+-- orders: admins can update order status
+DROP POLICY IF EXISTS "Admins can update orders" ON public.orders;
+CREATE POLICY "Admins can update orders"
+  ON public.orders FOR UPDATE USING (public.is_admin());
+
+-- vendor_applications: admins can SELECT, UPDATE, DELETE
+DROP POLICY IF EXISTS "Admins can manage applications" ON public.vendor_applications;
+CREATE POLICY "Admins can manage applications"
+  ON public.vendor_applications FOR ALL USING (public.is_admin());
+
+-- notifications: admins can see all
+DROP POLICY IF EXISTS "Admins can view all notifications" ON public.notifications;
+CREATE POLICY "Admins can view all notifications"
+  ON public.notifications FOR SELECT USING (public.is_admin() OR true);
+
+-- ==============================================================================
+-- 7. VENDOR STORE SETTINGS TABLE
+--    Vendors configure their own store (hours, status, banner message)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.vendor_store_settings (
+  vendor_id      TEXT PRIMARY KEY REFERENCES public.vendors(id) ON DELETE CASCADE,
+  owner_id       UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  is_open        BOOLEAN NOT NULL DEFAULT true,
+  opens_at       TEXT DEFAULT '08:00',
+  closes_at      TEXT DEFAULT '22:00',
+  banner_message TEXT,
+  paused_reason  TEXT,
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.vendor_store_settings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public can view store settings" ON public.vendor_store_settings;
+CREATE POLICY "Public can view store settings"
+  ON public.vendor_store_settings FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Vendors can manage own store settings" ON public.vendor_store_settings;
+CREATE POLICY "Vendors can manage own store settings"
+  ON public.vendor_store_settings FOR ALL USING (auth.uid() = owner_id OR public.is_admin());
+
+-- ==============================================================================
+-- 8. PLATFORM STATS VIEW (admin-readable aggregate)
+-- ==============================================================================
+CREATE OR REPLACE VIEW public.platform_stats AS
+SELECT
+  (SELECT COUNT(*) FROM public.profiles)::INTEGER                              AS total_users,
+  (SELECT COUNT(*) FROM public.profiles WHERE role = 'vendor')::INTEGER        AS total_vendors,
+  (SELECT COUNT(*) FROM public.profiles WHERE role = 'customer')::INTEGER      AS total_customers,
+  (SELECT COUNT(*) FROM public.orders)::INTEGER                                AS total_orders,
+  (SELECT COALESCE(SUM(total), 0) FROM public.orders)::BIGINT                  AS total_revenue,
+  (SELECT COUNT(*) FROM public.orders WHERE status = 'pending')::INTEGER       AS pending_orders,
+  (SELECT COUNT(*) FROM public.vendor_applications WHERE status = 'under_review')::INTEGER AS pending_applications,
+  (SELECT COUNT(*) FROM public.vendors WHERE verified = true)::INTEGER         AS verified_vendors;

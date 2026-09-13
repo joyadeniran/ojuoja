@@ -10,6 +10,7 @@ import { BecomeVendorModal } from "./components/Modals/BecomeVendorModal.jsx";
 import { AboutModal } from "./components/Modals/AboutModal.jsx";
 import { AuthModal } from "./components/Modals/AuthModal.jsx";
 import { NotificationCenterModal } from "./components/Modals/NotificationCenterModal.jsx";
+import { DashboardRouter } from "./views/dashboards/DashboardRouter.jsx";
 import { Toast } from "../components/feedback/Toast.jsx";
 import { PRODUCTS, PHOTO_BASE } from "./data/marketData.js";
 import {
@@ -371,6 +372,19 @@ export default function App() {
           <VendorDirectoryScreen
             onNav={nav}
             onOpenVendorModal={() => setVendorModalOpen(true)}
+          />
+        )}
+
+        {screen === "dashboard" && (
+          <DashboardRouter
+            currentUser={currentUser}
+            onNav={nav}
+            onSignOut={handleSignOut}
+            onOpenAuth={() => {
+              setAuthModalMode("login");
+              setAuthModalOpen(true);
+            }}
+            favourites={favourites}
           />
         )}
       </div>

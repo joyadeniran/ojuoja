@@ -412,6 +412,32 @@ export function Header({
                       type="button"
                       onClick={() => {
                         setUserMenuOpen(false);
+                        if (onNav) onNav("dashboard");
+                      }}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "10px 16px",
+                        background: "transparent",
+                        border: 0,
+                        font: "500 14px/1 var(--font-body)",
+                        color: "var(--text-heading)",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        borderBottom: "1px solid var(--border-subtle)",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-brand-soft)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    >
+                      <Icon name="layout-dashboard" size={14} style={{ color: "var(--text-brand)" }} />
+                      <span>My Dashboard</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUserMenuOpen(false);
                         if (onSignOut) onSignOut();
                       }}
                       style={{
@@ -668,6 +694,30 @@ export function Header({
             Become a Vendor (Apply Now)
           </button>
           <div style={{ borderTop: "1px solid var(--border-subtle)", margin: "4px 0" }} />
+          {currentUser && (
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                onNav("dashboard");
+              }}
+              style={{
+                textAlign: "left",
+                border: 0,
+                background: "transparent",
+                font: "600 15px var(--font-body)",
+                color: "var(--text-brand)",
+                cursor: "pointer",
+                padding: "6px 0",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Icon name="layout-dashboard" size={16} />
+              <span>My Dashboard</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
