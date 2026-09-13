@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Header } from "./components/Header.jsx";
 import { Footer } from "./components/Footer.jsx";
 import { HomeScreen } from "./views/HomeScreen.jsx";
