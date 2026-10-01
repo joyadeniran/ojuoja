@@ -214,3 +214,19 @@
 - Packaged role connectivity, OAuth onboarding wizard, admin suspension, and RLS security policies into feature branch
 - Created pull request against `main` and merged to deploy
 
+---
+
+## 2026-10-02 — Admin Vendor Approvals & Active Vendor Management
+- Added end-to-end `approveVendorApplication()` in `supabase.js`:
+  - Upgrades application to `approved`
+  - Creates/upserts vendor record in `public.vendors`
+  - Initializes `vendor_store_settings`
+  - Upgrades user profile to `role = 'vendor'` with `vendor_store_name` and completes onboarding
+  - Dispatches celebration notification to applicant and audit log to admin
+- Added `rejectVendorApplication()` and `toggleVendorVerification()`
+- Built dedicated **Vendor Approvals** queue tab in `AdminDashboard.jsx` with category, zone, phone click-to-call, status filtering (Pending, Approved, Rejected), and one-click "Approve & Launch Store" action
+- Built dedicated **Active Vendors** management tab in `AdminDashboard.jsx` with real-time search, delivery details, and one-click toggle for verified merchant badges
+- Connected quick-approval buttons in Admin Overview dashboard
+- Added dynamic action toast alerts in Super-Admin console
+
+
