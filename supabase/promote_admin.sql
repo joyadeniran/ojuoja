@@ -3,7 +3,13 @@
 -- Project: https://supabase.com/dashboard/project/mpxrsjbowjmimzctdinr/sql
 -- ============================================================
 
--- 1. Update public.profiles (sets admin role & bypasses onboarding wizard)
+-- Step 1: Ensure Phase 2 profile columns exist (safe / idempotent)
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS onboarding_complete BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS vendor_store_name TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS vendor_id TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS preferred_area TEXT;
+
+-- Step 2: Elevate blackfolio@gmail.com to admin & mark onboarding complete
 UPDATE public.profiles
 SET
   role                = 'admin',
@@ -11,13 +17,12 @@ SET
   updated_at          = NOW()
 WHERE LOWER(email) = 'blackfolio@gmail.com';
 
--- 2. Update auth.users metadata to ensure session claims match
+-- Step 3: Sync auth metadata
 UPDATE auth.users
 SET raw_user_meta_data = COALESCE(raw_user_meta_data, '{}'::jsonb) || '{"role": "admin"}'::jsonb
 WHERE LOWER(email) = 'blackfolio@gmail.com';
 
--- 3. Verify the update
+-- Step 4: Verify the update
 SELECT id, full_name, email, role, onboarding_complete, updated_at
 FROM public.profiles
 WHERE LOWER(email) = 'blackfolio@gmail.com';
-
