@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+- **Admin Vendor Approvals & Platform Vendor Management (`AdminDashboard.jsx`)**:
+  - Dedicated **Vendor Approvals** queue tab with category, zone, application date, and applicant phone dial links.
+  - End-to-end `approveVendorApplication` flow: updates application status to `approved`, creates merchant record in `public.vendors`, initializes `public.vendor_store_settings`, upgrades applicant's profile to `role = 'vendor'`, assigns `vendor_store_name`, and sends in-app notifications.
+  - Dedicated **Active Vendors** management tab: view all marketplace stores, search by name/zone, and 1-click toggle for verified merchant badges (`toggleVendorVerification`).
+  - Action feedback toast alerts in Admin Console for all operations.
 - **Post-Google-OAuth Onboarding Wizard (`OnboardingModal.jsx`)**: 3-step mandatory onboarding modal for users signing up via Google OAuth to select role (Customer, Vendor, Dispatch Rider) and submit required profile metadata.
 - **Profile Schema Expansion**:
   - `onboarding_complete` (boolean): Flags whether a user has finished initial onboarding.

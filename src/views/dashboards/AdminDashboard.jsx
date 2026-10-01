@@ -11,16 +11,19 @@ import {
   getAllOrders,
   updateOrderStatus,
   getAllVendorApplications,
-  updateApplicationStatus,
+  approveVendorApplication,
+  rejectVendorApplication,
+  getAllVendors,
+  toggleVendorVerification,
 } from "../../lib/supabase.js";
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
-function DashShell({ title, subtitle, children }) {
+function DashShell({ title, subtitle, toast, onClearToast, children }) {
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 20px 64px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
         <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--surface-brand)", color: "var(--text-on-brand)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Icon name="shield" size={18} />
+          <Icon name="shield-check" size={18} />
         </div>
         <div>
           <h1 style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 700, color: "var(--text-heading)", margin: 0 }}>{title}</h1>
@@ -29,17 +32,41 @@ function DashShell({ title, subtitle, children }) {
       </div>
 
       {/* Admin ribbon */}
-      <div style={{ background: "linear-gradient(90deg, var(--oj-green-900), var(--oj-green-700))", color: "#fff", borderRadius: 12, padding: "10px 20px", marginBottom: 28, display: "flex", alignItems: "center", gap: 10, fontSize: 13, fontWeight: 600 }}>
+      <div style={{ background: "linear-gradient(90deg, var(--oj-green-900), var(--oj-green-700))", color: "#fff", borderRadius: 12, padding: "10px 20px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10, fontSize: 13, fontWeight: 600 }}>
         <Icon name="shield-check" size={16} />
-        Super-Admin Console — Restricted Access. All actions are logged.
+        Super-Admin Console — Restricted Access. All vendor approvals, role elevations, and order actions are recorded.
       </div>
+
+      {/* Toast alert banner */}
+      {toast && (
+        <div style={{
+          marginBottom: 20, padding: "12px 18px", borderRadius: 10,
+          background: toast.tone === "danger" ? "#fff0f0" : "#dcfce7",
+          border: `1px solid ${toast.tone === "danger" ? "#fecaca" : "#86efac"}`,
+          color: toast.tone === "danger" ? "#991b1b" : "#166534",
+          fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "space-between",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Icon name={toast.tone === "danger" ? "x" : "check"} size={16} />
+            <span>{toast.message}</span>
+          </div>
+          <button
+            type="button"
+            onClick={onClearToast}
+            style={{ border: "none", background: "transparent", color: "inherit", cursor: "pointer", fontWeight: 700, fontSize: 14 }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {children}
     </div>
   );
 }
 
-function StatCard({ icon, label, value, delta, tone = "brand" }) {
+function StatCard({ icon, label, value, tone = "brand", onClick }) {
   const themes = {
     brand: { bg: "var(--surface-brand)", color: "var(--text-on-brand)", ib: "rgba(255,255,255,0.2)" },
     lime: { bg: "var(--surface-lime)", color: "var(--oj-green-900)", ib: "rgba(0,100,40,0.12)" },
@@ -49,12 +76,19 @@ function StatCard({ icon, label, value, delta, tone = "brand" }) {
   };
   const t = themes[tone] || themes.brand;
   return (
-    <div style={{ background: t.bg, color: t.color, borderRadius: 16, padding: "20px 24px", display: "flex", flexDirection: "column", gap: 10 }}>
+    <div
+      onClick={onClick}
+      style={{
+        background: t.bg, color: t.color, borderRadius: 16, padding: "20px 24px",
+        display: "flex", flexDirection: "column", gap: 10, cursor: onClick ? "pointer" : "default",
+        transition: "transform 0.15s ease",
+      }}
+    >
       <div style={{ width: 38, height: 38, borderRadius: 10, background: t.ib, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <Icon name={icon} size={18} />
       </div>
       <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.5px" }}>{value}</div>
-      <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.75, textTransform: "uppercase", letterSpacing: "0.07em" }}>{label}</div>
+      <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.85, textTransform: "uppercase", letterSpacing: "0.07em" }}>{label}</div>
     </div>
   );
 }
@@ -62,7 +96,7 @@ function StatCard({ icon, label, value, delta, tone = "brand" }) {
 function SectionCard({ title, icon, action, noPad, children }) {
   return (
     <div style={{ background: "#fff", border: "1px solid var(--border-subtle)", borderRadius: 16, overflow: "hidden", marginBottom: 24 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 24px", borderBottom: "1px solid var(--border-subtle)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 24px", borderBottom: "1px solid var(--border-subtle)", flexWrap: "wrap", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {icon && <Icon name={icon} size={18} style={{ color: "var(--text-brand)" }} />}
           <span style={{ fontWeight: 700, fontSize: 15, color: "var(--text-heading)" }}>{title}</span>
@@ -75,7 +109,7 @@ function SectionCard({ title, icon, action, noPad, children }) {
 }
 
 const ROLE_BADGE = {
-  admin: { tone: "brand", icon: "shield" },
+  admin: { tone: "brand", icon: "shield-check" },
   vendor: { tone: "lime", icon: "store" },
   dispatch: { tone: "accent", icon: "bike" },
   customer: { tone: "neutral", icon: "user" },
@@ -100,7 +134,7 @@ function StatusPill({ status }) {
   );
 }
 
-// ── Users Table ───────────────────────────────────────────────────────────────
+// ── Users Section ─────────────────────────────────────────────────────────────
 function UsersSection({ users, onRoleChange, onSuspend, onRestore, loading }) {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -113,7 +147,7 @@ function UsersSection({ users, onRoleChange, onSuspend, onRestore, loading }) {
   });
 
   return (
-    <SectionCard title={`Users (${users.length})`} icon="users" noPad
+    <SectionCard title={`Users (${users.length})`} icon="user" noPad
       action={
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <input
@@ -139,7 +173,6 @@ function UsersSection({ users, onRoleChange, onSuspend, onRestore, loading }) {
         <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>No users match your search</div>
       ) : (
         <>
-          {/* Table header */}
           <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1.6fr", gap: 12, padding: "10px 24px", background: "var(--surface-sunken)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-faint)" }}>
             <div>Name / Email</div><div>Provider</div><div>Role</div><div>Actions</div>
           </div>
@@ -170,7 +203,7 @@ function UsersSection({ users, onRoleChange, onSuspend, onRestore, loading }) {
                 </div>
                 <div>
                   {!isSuspended && <Badge tone={rb.tone} icon={rb.icon}>{user.role}</Badge>}
-                  {isSuspended && <Badge tone="danger" icon="slash">suspended</Badge>}
+                  {isSuspended && <Badge tone="danger" icon="x">suspended</Badge>}
                 </div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                   {!isSuspended && (
@@ -186,6 +219,7 @@ function UsersSection({ users, onRoleChange, onSuspend, onRestore, loading }) {
                         <option value="admin">Admin</option>
                       </select>
                       <button
+                        type="button"
                         onClick={() => {
                           if (window.confirm(`Suspend ${user.full_name || user.email}? They will lose access immediately.`)) {
                             onSuspend(user.id);
@@ -200,23 +234,23 @@ function UsersSection({ users, onRoleChange, onSuspend, onRestore, loading }) {
                           fontFamily: "var(--font-body)",
                         }}
                       >
-                        🚫 Suspend
+                        Suspend
                       </button>
                     </>
                   )}
                   {isSuspended && (
                     <button
+                      type="button"
                       onClick={() => onRestore(user.id)}
-                      title="Restore user"
                       style={{
-                        padding: "5px 12px", border: "1px solid var(--border-subtle)",
+                        padding: "5px 12px", border: "1px solid #86efac",
                         borderRadius: 8, background: "var(--surface-lime)",
-                        color: "var(--oj-green-900)", fontSize: 11, fontWeight: 700,
+                        color: "var(--oj-green-900)", fontSize: 12, fontWeight: 700,
                         cursor: "pointer", whiteSpace: "nowrap",
                         fontFamily: "var(--font-body)",
                       }}
                     >
-                      ✓ Restore
+                      Restore
                     </button>
                   )}
                 </div>
@@ -229,14 +263,173 @@ function UsersSection({ users, onRoleChange, onSuspend, onRestore, loading }) {
   );
 }
 
-// ── Orders Table ──────────────────────────────────────────────────────────────
+// ── Active Vendors Section ───────────────────────────────────────────────────
+function VendorsSection({ vendors, onToggleVerified, loading }) {
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const filtered = vendors.filter((v) => {
+    const q = search.toLowerCase();
+    const matchSearch =
+      !q ||
+      (v.name || "").toLowerCase().includes(q) ||
+      (v.area || "").toLowerCase().includes(q);
+    const matchStatus =
+      statusFilter === "all" ||
+      (statusFilter === "verified" && v.verified) ||
+      (statusFilter === "unverified" && !v.verified);
+    return matchSearch && matchStatus;
+  });
+
+  return (
+    <SectionCard
+      title={`Active Platform Vendors (${vendors.length})`}
+      icon="store"
+      noPad
+      action={
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search store / area…"
+            style={{
+              padding: "6px 12px",
+              border: "1px solid var(--border-input)",
+              borderRadius: 99,
+              fontSize: 13,
+              outline: "none",
+              fontFamily: "var(--font-body)",
+              width: 180,
+            }}
+          />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            style={{
+              padding: "6px 12px",
+              border: "1px solid var(--border-input)",
+              borderRadius: 99,
+              fontSize: 13,
+              outline: "none",
+              fontFamily: "var(--font-body)",
+              background: "#fff",
+            }}
+          >
+            <option value="all">All Vendors</option>
+            <option value="verified">Verified Only</option>
+            <option value="unverified">Unverified Only</option>
+          </select>
+        </div>
+      }
+    >
+      {loading ? (
+        <div style={{ padding: 40, textAlign: "center", color: "var(--text-faint)", fontSize: 14 }}>
+          Loading marketplace vendors…
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>
+          No vendors match your search
+        </div>
+      ) : (
+        <>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "2.5fr 1.2fr 1fr 1.2fr 1.3fr",
+              gap: 12,
+              padding: "10px 24px",
+              background: "var(--surface-sunken)",
+              fontSize: 11,
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              color: "var(--text-faint)",
+            }}
+          >
+            <div>Vendor Store</div>
+            <div>Zone / Area</div>
+            <div>Rating & ETA</div>
+            <div>Verification</div>
+            <div>Actions</div>
+          </div>
+          {filtered.map((vendor, idx) => (
+            <div
+              key={vendor.id}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "2.5fr 1.2fr 1fr 1.2fr 1.3fr",
+                gap: 12,
+                alignItems: "center",
+                padding: "14px 24px",
+                borderTop: "1px solid var(--border-subtle)",
+                background: idx % 2 === 0 ? "transparent" : "var(--surface-sunken)",
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text-heading)", display: "flex", alignItems: "center", gap: 6 }}>
+                  {vendor.name}
+                  {vendor.verified && (
+                    <span style={{ color: "var(--text-brand)", fontSize: 13 }} title="Verified Merchant">✓</span>
+                  )}
+                </div>
+                <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 2 }}>
+                  {vendor.tagline || vendor.description || `ID: ${vendor.id}`}
+                </div>
+              </div>
+              <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{vendor.area}</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                ⭐ {vendor.rating || 4.8} • {vendor.delivery_mins || 35}m
+              </div>
+              <div>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: "3px 10px",
+                    borderRadius: 99,
+                    background: vendor.verified ? "#dcfce7" : "#f1f5f9",
+                    color: vendor.verified ? "#166534" : "#64748b",
+                  }}
+                >
+                  {vendor.verified ? "Verified ✓" : "Unverified"}
+                </span>
+              </div>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => onToggleVerified(vendor.id, vendor.verified)}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 8,
+                    border: `1px solid ${vendor.verified ? "#fecaca" : "var(--border-brand, #009245)"}`,
+                    background: vendor.verified ? "#fff0f0" : "var(--surface-lime)",
+                    color: vendor.verified ? "#991b1b" : "var(--oj-green-900)",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {vendor.verified ? "Revoke Verification" : "Mark Verified ✓"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+    </SectionCard>
+  );
+}
+
+// ── Orders Section ────────────────────────────────────────────────────────────
 function OrdersSection({ orders, onStatusChange, loading }) {
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const filtered = statusFilter === "all" ? orders : orders.filter((o) => o.status === statusFilter);
+  const filtered = orders.filter((o) => statusFilter === "all" || o.status === statusFilter);
 
   return (
-    <SectionCard title={`All Orders (${orders.length})`} icon="package" noPad
+    <SectionCard title={`Platform Orders (${orders.length})`} icon="package" noPad
       action={
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
           style={{ padding: "6px 12px", border: "1px solid var(--border-input)", borderRadius: 99, fontSize: 13, outline: "none", fontFamily: "var(--font-body)", background: "#fff" }}>
@@ -253,91 +446,235 @@ function OrdersSection({ orders, onStatusChange, loading }) {
       ) : filtered.length === 0 ? (
         <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>No orders found</div>
       ) : (
-        <>
-          <div style={{ display: "grid", gridTemplateColumns: "80px 2fr 1fr 1fr 1fr 1fr", gap: 12, padding: "10px 24px", background: "var(--surface-sunken)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-faint)" }}>
-            <div>ID</div><div>Items / Address</div><div>Phone</div><div>Amount</div><div>Status</div><div>Update</div>
+        <div>
+          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 2fr 1fr 1fr 1.4fr", gap: 12, padding: "10px 24px", background: "var(--surface-sunken)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-faint)" }}>
+            <div>Order Ref</div><div>Items & Address</div><div>Total</div><div>Status</div><div>Change Status</div>
           </div>
-          {filtered.slice(0, 30).map((order, idx) => (
-            <div key={order.id} style={{
-              display: "grid", gridTemplateColumns: "80px 2fr 1fr 1fr 1fr 1fr", gap: 12,
-              alignItems: "center", padding: "14px 24px",
-              borderTop: "1px solid var(--border-subtle)",
-            }}>
-              <div style={{ fontSize: 12, color: "var(--text-faint)", fontFamily: "monospace" }}>#{String(order.id).padStart(5, "0")}</div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text-heading)" }}>
-                  {(order.items || []).slice(0, 2).map((i) => i.name).join(", ")}
-                  {(order.items || []).length > 2 ? ` +${(order.items || []).length - 2}` : ""}
+          {filtered.map((order, idx) => {
+            const dateStr = order.created_at ? new Date(order.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
+            const itemCount = (order.items || []).reduce((s, i) => s + (i.qty || 1), 0);
+            return (
+              <div key={order.id} style={{
+                display: "grid", gridTemplateColumns: "1.2fr 2fr 1fr 1fr 1.4fr", gap: 12,
+                alignItems: "center", padding: "14px 24px",
+                borderTop: "1px solid var(--border-subtle)",
+                background: idx % 2 === 0 ? "transparent" : "var(--surface-sunken)",
+              }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text-heading)", fontFamily: "monospace" }}>#{String(order.id).slice(-8)}</div>
+                  <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{dateStr}</div>
                 </div>
-                <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 2 }}>{order.delivery_address}</div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-heading)" }}>{itemCount} item(s) • {order.phone}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{order.delivery_address}</div>
+                </div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text-brand)" }}>
+                  ₦{(order.total || 0).toLocaleString("en-NG")}
+                </div>
+                <div><StatusPill status={order.status} /></div>
+                <div>
+                  <select
+                    value={order.status}
+                    onChange={(e) => onStatusChange(order.id, e.target.value)}
+                    style={{ padding: "5px 8px", border: "1px solid var(--border-input)", borderRadius: 8, fontSize: 12, outline: "none", fontFamily: "var(--font-body)", background: "#fff", cursor: "pointer" }}
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
               </div>
-              <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{order.phone}</div>
-              <div style={{ fontWeight: 700, fontSize: 14 }}>₦{(order.total || 0).toLocaleString("en-NG")}</div>
-              <div><StatusPill status={order.status} /></div>
-              <div>
-                <select value={order.status} onChange={(e) => onStatusChange(order.id, e.target.value)}
-                  style={{ padding: "5px 8px", border: "1px solid var(--border-input)", borderRadius: 8, fontSize: 12, outline: "none", fontFamily: "var(--font-body)", background: "#fff", cursor: "pointer" }}>
-                  <option value="pending">Pending</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </div>
-            </div>
-          ))}
-        </>
+            );
+          })}
+        </div>
       )}
     </SectionCard>
   );
 }
 
-// ── Applications Section ──────────────────────────────────────────────────────
-function ApplicationsSection({ applications, onStatusChange, loading }) {
-  const pending = applications.filter((a) => a.status === "under_review");
+// ── Vendor Applications Section (Approvals Queue) ─────────────────────────────
+function ApplicationsSection({ applications, onApprove, onReject, loading, processingId }) {
+  const [filter, setFilter] = useState("under_review");
+
+  const counts = {
+    all: applications.length,
+    under_review: applications.filter((a) => a.status === "under_review").length,
+    approved: applications.filter((a) => a.status === "approved").length,
+    rejected: applications.filter((a) => a.status === "rejected").length,
+  };
+
+  const filtered = applications.filter((a) => filter === "all" || a.status === filter);
 
   return (
-    <SectionCard title={`Vendor Applications${pending.length ? ` · ${pending.length} pending` : ""}`} icon="store" noPad>
+    <SectionCard
+      title={`Vendor Approval Queue (${counts.under_review} pending)`}
+      icon="badge-check"
+      noPad
+      action={
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {[
+            { id: "under_review", label: "Pending Review", count: counts.under_review },
+            { id: "all", label: "All", count: counts.all },
+            { id: "approved", label: "Approved", count: counts.approved },
+            { id: "rejected", label: "Rejected", count: counts.rejected },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setFilter(tab.id)}
+              style={{
+                padding: "5px 12px",
+                borderRadius: 99,
+                border: filter === tab.id ? "1px solid var(--surface-brand)" : "1px solid var(--border-subtle)",
+                background: filter === tab.id ? "var(--surface-brand)" : "#fff",
+                color: filter === tab.id ? "var(--text-on-brand)" : "var(--text-muted)",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+            >
+              {tab.label} ({tab.count})
+            </button>
+          ))}
+        </div>
+      }
+    >
       {loading ? (
-        <div style={{ padding: 40, textAlign: "center", color: "var(--text-faint)", fontSize: 14 }}>Loading applications…</div>
-      ) : applications.length === 0 ? (
-        <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>No vendor applications yet</div>
+        <div style={{ padding: 40, textAlign: "center", color: "var(--text-faint)", fontSize: 14 }}>
+          Loading vendor applications…
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={{ padding: 48, textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 22, background: "var(--surface-lime)", color: "var(--oj-green-900)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}>
+            <Icon name="check" size={24} />
+          </div>
+          <div style={{ fontWeight: 600, color: "var(--text-heading)", marginBottom: 4 }}>No applications found</div>
+          <div style={{ fontSize: 13, color: "var(--text-muted)" }}>There are currently no vendor submissions in this view.</div>
+        </div>
       ) : (
         <div>
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr", gap: 12, padding: "10px 24px", background: "var(--surface-sunken)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-faint)" }}>
-            <div>Shop / Owner</div><div>Area</div><div>Category</div><div>Status</div><div>Actions</div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "2.2fr 1fr 1fr 1fr 1.6fr",
+              gap: 12,
+              padding: "10px 24px",
+              background: "var(--surface-sunken)",
+              fontSize: 11,
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              color: "var(--text-faint)",
+            }}
+          >
+            <div>Shop & Applicant</div>
+            <div>Zone / Area</div>
+            <div>Category</div>
+            <div>Status</div>
+            <div>Approval Actions</div>
           </div>
-          {applications.map((app, idx) => (
-            <div key={app.id} style={{
-              display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr", gap: 12,
-              alignItems: "center", padding: "14px 24px",
-              borderTop: "1px solid var(--border-subtle)",
-            }}>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text-heading)" }}>{app.shop_name}</div>
-                <div style={{ fontSize: 12, color: "var(--text-faint)" }}>{app.owner_name} • {app.phone}</div>
+          {filtered.map((app) => {
+            const isProcessing = processingId === app.id;
+            const appliedDate = app.created_at
+              ? new Date(app.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+              : "Recent";
+
+            return (
+              <div
+                key={app.id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "2.2fr 1fr 1fr 1fr 1.6fr",
+                  gap: 12,
+                  alignItems: "center",
+                  padding: "16px 24px",
+                  borderTop: "1px solid var(--border-subtle)",
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text-heading)" }}>
+                    {app.shop_name}
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--text-faint)", display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
+                    <span>{app.owner_name}</span>
+                    <span>•</span>
+                    <a href={`tel:${app.phone}`} style={{ color: "var(--text-brand)", textDecoration: "none", fontWeight: 600 }}>
+                      📞 {app.phone}
+                    </a>
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                    Applied {appliedDate}
+                  </div>
+                </div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{app.area}</div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{app.category}</div>
+                <div>
+                  <StatusPill status={app.status} />
+                </div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  {app.status === "under_review" && (
+                    <>
+                      <button
+                        type="button"
+                        disabled={isProcessing}
+                        onClick={() => onApprove(app)}
+                        style={{
+                          padding: "6px 14px",
+                          borderRadius: 8,
+                          border: "none",
+                          background: "var(--surface-lime)",
+                          color: "var(--oj-green-900)",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: isProcessing ? "not-allowed" : "pointer",
+                          opacity: isProcessing ? 0.6 : 1,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+                        }}
+                      >
+                        ✓ {isProcessing ? "Approving…" : "Approve & Launch"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isProcessing}
+                        onClick={() => {
+                          if (window.confirm(`Reject vendor application for "${app.shop_name}"?`)) {
+                            onReject(app.id);
+                          }
+                        }}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: 8,
+                          border: "1px solid #fecaca",
+                          background: "#fff0f0",
+                          color: "#991b1b",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: isProcessing ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        ✕ Reject
+                      </button>
+                    </>
+                  )}
+                  {app.status === "approved" && (
+                    <span style={{ fontSize: 12, color: "#166534", fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
+                      <Icon name="check" size={14} /> Store Live & Verified
+                    </span>
+                  )}
+                  {app.status === "rejected" && (
+                    <span style={{ fontSize: 12, color: "#991b1b", fontWeight: 600 }}>
+                      ✕ Application Rejected
+                    </span>
+                  )}
+                </div>
               </div>
-              <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{app.area}</div>
-              <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{app.category}</div>
-              <div><StatusPill status={app.status} /></div>
-              <div style={{ display: "flex", gap: 6 }}>
-                {app.status === "under_review" && (
-                  <>
-                    <button onClick={() => onStatusChange(app.id, "approved")}
-                      style={{ padding: "5px 10px", borderRadius: 8, border: "none", background: "var(--surface-lime)", color: "var(--oj-green-900)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                      ✓ Approve
-                    </button>
-                    <button onClick={() => onStatusChange(app.id, "rejected")}
-                      style={{ padding: "5px 10px", borderRadius: 8, border: "none", background: "#fee2e2", color: "#991b1b", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                      ✕ Reject
-                    </button>
-                  </>
-                )}
-                {app.status !== "under_review" && (
-                  <span style={{ fontSize: 12, color: "var(--text-faint)", fontStyle: "italic" }}>{app.status}</span>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </SectionCard>
@@ -346,10 +683,11 @@ function ApplicationsSection({ applications, onStatusChange, loading }) {
 
 // ── Nav Tabs ──────────────────────────────────────────────────────────────────
 const TABS = [
-  { id: "overview", label: "Overview", icon: "layout-dashboard" },
-  { id: "users", label: "Users", icon: "users" },
+  { id: "overview", label: "Overview", icon: "layout-grid" },
+  { id: "applications", label: "Vendor Approvals", icon: "badge-check" },
+  { id: "vendors", label: "Active Vendors", icon: "store" },
+  { id: "users", label: "Users", icon: "user" },
   { id: "orders", label: "Orders", icon: "package" },
-  { id: "applications", label: "Applications", icon: "store" },
 ];
 
 // ── Main Component ─────────────────────────────────────────────────────────────
@@ -358,8 +696,11 @@ export function AdminDashboard({ currentUser, onNav, onSignOut }) {
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [vendors, setVendors] = useState([]);
   const [applications, setApplications] = useState([]);
-  const [loading, setLoading] = useState({ stats: true, users: true, orders: true, apps: true });
+  const [processingAppId, setProcessingAppId] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [loading, setLoading] = useState({ stats: true, users: true, orders: true, apps: true, vendors: true });
 
   useEffect(() => {
     getPlatformStats().then((data) => {
@@ -378,52 +719,119 @@ export function AdminDashboard({ currentUser, onNav, onSignOut }) {
       setApplications(data);
       setLoading((l) => ({ ...l, apps: false }));
     });
+    getAllVendors().then((data) => {
+      setVendors(data);
+      setLoading((l) => ({ ...l, vendors: false }));
+    });
   }, []);
+
+  // Clear toast automatically after 5 seconds
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   const handleRoleChange = useCallback(async (userId, role) => {
     const result = await updateProfileRole(userId, role);
     if (result.success) {
-      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role } : u));
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role } : u)));
+      setToast({ tone: "success", message: `User role updated to ${role}.` });
     }
   }, []);
 
   const handleSuspend = useCallback(async (userId) => {
     const result = await suspendProfile(userId);
     if (result.success) {
-      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: "suspended" } : u));
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: "suspended" } : u)));
+      setToast({ tone: "danger", message: "User account suspended." });
     }
   }, []);
 
   const handleRestore = useCallback(async (userId) => {
     const result = await restoreProfile(userId);
     if (result.success) {
-      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: "customer" } : u));
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: "customer" } : u)));
+      setToast({ tone: "success", message: "User account restored." });
     }
   }, []);
 
   const handleOrderStatusChange = useCallback(async (orderId, status) => {
     const result = await updateOrderStatus(orderId, status);
     if (result.success) {
-      setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status } : o));
+      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
+      setToast({ tone: "success", message: `Order #${String(orderId).slice(-6)} set to ${status}.` });
     }
   }, []);
 
-  const handleApplicationStatusChange = useCallback(async (appId, status) => {
-    const result = await updateApplicationStatus(appId, status);
+  const handleApproveVendor = useCallback(async (app) => {
+    setProcessingAppId(app.id);
+    const result = await approveVendorApplication(app);
+    setProcessingAppId(null);
     if (result.success) {
-      setApplications((prev) => prev.map((a) => a.id === appId ? { ...a, status } : a));
+      setApplications((prev) => prev.map((a) => (a.id === app.id ? { ...a, status: "approved" } : a)));
+      // Add or update in vendors list
+      if (result.vendor) {
+        setVendors((prev) => [result.vendor, ...prev.filter((v) => v.id !== result.vendor.id)]);
+      }
+      // If applicant exists, update users state
+      if (app.applicant_id) {
+        setUsers((prev) =>
+          prev.map((u) => (u.id === app.applicant_id ? { ...u, role: "vendor" } : u))
+        );
+      }
+      setToast({
+        tone: "success",
+        message: `🎉 Approved "${app.shop_name}"! Store is live and applicant account elevated to Vendor.`,
+      });
+    } else {
+      setToast({ tone: "danger", message: `Failed to approve vendor: ${result.error || "Unknown error"}` });
+    }
+  }, []);
+
+  const handleRejectVendor = useCallback(async (appId, notes = "") => {
+    setProcessingAppId(appId);
+    const result = await rejectVendorApplication(appId, notes);
+    setProcessingAppId(null);
+    if (result.success) {
+      setApplications((prev) => prev.map((a) => (a.id === appId ? { ...a, status: "rejected" } : a)));
+      setToast({ tone: "danger", message: "Vendor application marked as rejected." });
+    } else {
+      setToast({ tone: "danger", message: `Failed to reject application: ${result.error}` });
+    }
+  }, []);
+
+  const handleToggleVerified = useCallback(async (vendorId, currentVerified) => {
+    const result = await toggleVendorVerification(vendorId, currentVerified);
+    if (result.success) {
+      setVendors((prev) =>
+        prev.map((v) => (v.id === vendorId ? { ...v, verified: !currentVerified } : v))
+      );
+      setToast({
+        tone: "success",
+        message: `Vendor verification ${!currentVerified ? "enabled ✓" : "revoked"}.`,
+      });
+    } else {
+      setToast({ tone: "danger", message: `Failed to update verification: ${result.error}` });
     }
   }, []);
 
   const pendingApps = applications.filter((a) => a.status === "under_review").length;
 
   return (
-    <DashShell title="Super-Admin Dashboard" subtitle={`Logged in as ${currentUser?.fullName || "Administrator"} — Ojawa Marketplace`}>
-
+    <DashShell
+      title="Super-Admin Dashboard"
+      subtitle={`Logged in as ${currentUser?.fullName || "Administrator"} — Ojawa Marketplace`}
+      toast={toast}
+      onClearToast={() => setToast(null)}
+    >
       {/* Tab Navigation */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 28, borderBottom: "1px solid var(--border-subtle)", paddingBottom: 0 }}>
+      <div style={{ display: "flex", gap: 4, marginBottom: 28, borderBottom: "1px solid var(--border-subtle)", paddingBottom: 0, overflowX: "auto" }}>
         {TABS.map((tab) => (
-          <button key={tab.id} type="button"
+          <button
+            key={tab.id}
+            type="button"
             onClick={() => setActiveTab(tab.id)}
             style={{
               display: "flex", alignItems: "center", gap: 7,
@@ -434,22 +842,26 @@ export function AdminDashboard({ currentUser, onNav, onSignOut }) {
               borderBottom: `2px solid ${activeTab === tab.id ? "var(--surface-brand)" : "transparent"}`,
               marginBottom: -1,
               position: "relative",
+              whiteSpace: "nowrap",
               transition: "color 0.15s ease",
             }}
           >
             <Icon name={tab.icon} size={15} />
             {tab.label}
             {tab.id === "applications" && pendingApps > 0 && (
-              <span style={{ background: "var(--color-danger)", color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 99, padding: "1px 5px", marginLeft: 2 }}>
+              <span style={{ background: "var(--color-danger, #dc2626)", color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 99, padding: "1px 6px", marginLeft: 4 }}>
                 {pendingApps}
               </span>
             )}
           </button>
         ))}
         <div style={{ marginLeft: "auto", alignSelf: "center" }}>
-          <button type="button" onClick={onSignOut}
-            style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "1px solid var(--border-subtle)", borderRadius: 99, padding: "6px 14px", fontSize: 12, fontWeight: 600, color: "var(--color-danger, #dc2626)", cursor: "pointer" }}>
-            <Icon name="log-out" size={13} />
+          <button
+            type="button"
+            onClick={onSignOut}
+            style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "1px solid var(--border-subtle)", borderRadius: 99, padding: "6px 14px", fontSize: 12, fontWeight: 600, color: "var(--color-danger, #dc2626)", cursor: "pointer" }}
+          >
+            <Icon name="x" size={13} />
             Sign Out
           </button>
         </div>
@@ -458,18 +870,24 @@ export function AdminDashboard({ currentUser, onNav, onSignOut }) {
       {/* OVERVIEW TAB */}
       {activeTab === "overview" && (
         <div>
-          {/* Platform Stats */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16, marginBottom: 32 }}>
-            <StatCard icon="users" label="Total Users" value={loading.stats ? "…" : (stats?.total_users ?? 0)} tone="brand" />
-            <StatCard icon="store" label="Verified Vendors" value={loading.stats ? "…" : (stats?.verified_vendors ?? 0)} tone="lime" />
-            <StatCard icon="package" label="Total Orders" value={loading.stats ? "…" : (stats?.total_orders ?? 0)} tone="accent" />
-            <StatCard icon="trending-up" label="Platform Revenue" value={loading.stats ? "…" : `₦${(stats?.total_revenue || 0).toLocaleString("en-NG")}`} tone="neutral" />
-            <StatCard icon="clock" label="Pending Orders" value={loading.stats ? "…" : (stats?.pending_orders ?? 0)} tone="danger" />
-            <StatCard icon="file-check" label="Pending Applications" value={loading.stats ? "…" : (stats?.pending_applications ?? 0)} tone="danger" />
+          {/* Platform Stat Bar */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 28 }}>
+            <StatCard icon="wallet" label="Platform Revenue" value={`₦${(stats?.revenue || 0).toLocaleString("en-NG")}`} tone="brand" />
+            <StatCard icon="package" label="Total Orders" value={stats?.orders ?? orders.length} tone="lime" onClick={() => setActiveTab("orders")} />
+            <StatCard icon="user" label="Total Users" value={stats?.users ?? users.length} tone="neutral" onClick={() => setActiveTab("users")} />
+            <StatCard icon="store" label="Active Vendors" value={vendors.length} tone="accent" onClick={() => setActiveTab("vendors")} />
+            <StatCard
+              icon="badge-check"
+              label="Pending Approvals"
+              value={pendingApps}
+              tone={pendingApps > 0 ? "danger" : "neutral"}
+              onClick={() => setActiveTab("applications")}
+            />
           </div>
 
-          {/* Quick overview: recent orders + pending applications */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+          {/* Quick Review Grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: 20 }}>
+            {/* Recent Orders */}
             <SectionCard title="Recent Orders" icon="package" noPad action={
               <Button variant="ghost" size="sm" onClick={() => setActiveTab("orders")}>View all</Button>
             }>
@@ -478,14 +896,14 @@ export function AdminDashboard({ currentUser, onNav, onSignOut }) {
                   display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
                   padding: "12px 20px", borderTop: idx > 0 ? "1px solid var(--border-subtle)" : "none",
                 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text-heading)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {(order.items || []).slice(0, 1).map((i) => i.name).join(", ")}
-                      {(order.items || []).length > 1 ? ` +${(order.items || []).length - 1}` : ""}
-                    </div>
-                    <div style={{ fontSize: 11, color: "var(--text-faint)" }}>₦{(order.total || 0).toLocaleString("en-NG")} • {order.delivery_address}</div>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text-heading)", fontFamily: "monospace" }}>#{String(order.id).slice(-8)}</div>
+                    <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{order.phone} • {order.delivery_address}</div>
                   </div>
-                  <StatusPill status={order.status} />
+                  <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text-brand)" }}>₦{(order.total || 0).toLocaleString("en-NG")}</div>
+                    <StatusPill status={order.status} />
+                  </div>
                 </div>
               ))}
               {orders.length === 0 && !loading.orders && (
@@ -493,39 +911,79 @@ export function AdminDashboard({ currentUser, onNav, onSignOut }) {
               )}
             </SectionCard>
 
-            <SectionCard title="Pending Applications" icon="store" noPad action={
-              <Button variant="ghost" size="sm" onClick={() => setActiveTab("applications")}>View all</Button>
-            }>
+            {/* Pending Approvals quick-review */}
+            <SectionCard
+              title={`Pending Vendor Approvals (${pendingApps})`}
+              icon="badge-check"
+              noPad
+              action={
+                <Button variant="ghost" size="sm" onClick={() => setActiveTab("applications")}>View queue</Button>
+              }
+            >
               {applications.filter((a) => a.status === "under_review").slice(0, 5).map((app, idx) => (
                 <div key={app.id} style={{
                   display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-                  padding: "12px 20px", borderTop: idx > 0 ? "1px solid var(--border-subtle)" : "none",
+                  padding: "14px 20px", borderTop: idx > 0 ? "1px solid var(--border-subtle)" : "none",
                 }}>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text-heading)" }}>{app.shop_name}</div>
-                    <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{app.area} • {app.category}</div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text-heading)" }}>{app.shop_name}</div>
+                    <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{app.owner_name} • {app.area} ({app.category})</div>
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
-                    <button onClick={() => handleApplicationStatusChange(app.id, "approved")}
-                      style={{ padding: "4px 8px", borderRadius: 6, border: "none", background: "var(--surface-lime)", color: "var(--oj-green-900)", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-                      ✓
+                    <button
+                      type="button"
+                      title="Approve & Launch Store"
+                      onClick={() => handleApproveVendor(app)}
+                      style={{ padding: "6px 10px", borderRadius: 6, border: "none", background: "var(--surface-lime)", color: "var(--oj-green-900)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                    >
+                      ✓ Approve
                     </button>
-                    <button onClick={() => handleApplicationStatusChange(app.id, "rejected")}
-                      style={{ padding: "4px 8px", borderRadius: 6, border: "none", background: "#fee2e2", color: "#991b1b", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                    <button
+                      type="button"
+                      title="Reject Application"
+                      onClick={() => {
+                        if (window.confirm(`Reject vendor application for ${app.shop_name}?`)) {
+                          handleRejectVendor(app.id);
+                        }
+                      }}
+                      style={{ padding: "6px 10px", borderRadius: 6, border: "none", background: "#fee2e2", color: "#991b1b", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                    >
                       ✕
                     </button>
                   </div>
                 </div>
               ))}
-              {applications.filter((a) => a.status === "under_review").length === 0 && !loading.apps && (
-                <div style={{ padding: 28, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
-                  <Icon name="check-circle" size={28} style={{ color: "var(--text-brand)", marginBottom: 8 }} />
-                  <div>All applications reviewed</div>
+              {pendingApps === 0 && !loading.apps && (
+                <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 18, background: "var(--surface-lime)", color: "var(--oj-green-900)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 8px" }}>
+                    <Icon name="check" size={20} />
+                  </div>
+                  <div>All vendor applications reviewed</div>
                 </div>
               )}
             </SectionCard>
           </div>
         </div>
+      )}
+
+      {/* VENDOR APPROVALS TAB */}
+      {activeTab === "applications" && (
+        <ApplicationsSection
+          applications={applications}
+          onApprove={handleApproveVendor}
+          onReject={handleRejectVendor}
+          loading={loading.apps}
+          processingId={processingAppId}
+        />
+      )}
+
+      {/* ACTIVE VENDORS TAB */}
+      {activeTab === "vendors" && (
+        <VendorsSection
+          vendors={vendors}
+          onToggleVerified={handleToggleVerified}
+          loading={loading.vendors}
+        />
       )}
 
       {/* USERS TAB */}
@@ -542,11 +1000,6 @@ export function AdminDashboard({ currentUser, onNav, onSignOut }) {
       {/* ORDERS TAB */}
       {activeTab === "orders" && (
         <OrdersSection orders={orders} onStatusChange={handleOrderStatusChange} loading={loading.orders} />
-      )}
-
-      {/* APPLICATIONS TAB */}
-      {activeTab === "applications" && (
-        <ApplicationsSection applications={applications} onStatusChange={handleApplicationStatusChange} loading={loading.apps} />
       )}
     </DashShell>
   );
