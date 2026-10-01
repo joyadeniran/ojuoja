@@ -10,13 +10,16 @@ import { BecomeVendorModal } from "./components/Modals/BecomeVendorModal.jsx";
 import { AboutModal } from "./components/Modals/AboutModal.jsx";
 import { AuthModal } from "./components/Modals/AuthModal.jsx";
 import { NotificationCenterModal } from "./components/Modals/NotificationCenterModal.jsx";
+import { OnboardingModal } from "./components/Modals/OnboardingModal.jsx";
 import { DashboardRouter } from "./views/dashboards/DashboardRouter.jsx";
 import { Toast } from "../components/feedback/Toast.jsx";
 import { PRODUCTS, PHOTO_BASE } from "./data/marketData.js";
 import {
   createOrder as createSupabaseOrder,
-  submitVendorApplication as submitSupabaseVendorApplication,
   recordNotification as recordSupabaseNotification,
+  getNotifications as getSupabaseNotifications,
+  getUnreadNotificationCount,
+  markNotificationsRead,
   checkSupabaseConnection,
   onAuthChange,
   getProfile,
@@ -46,32 +49,26 @@ const DEFAULT_BASKET = [
   },
 ];
 
-const INITIAL_NOTIFICATIONS = [
-  {
-    id: "notif-1",
-    recipient: "vendor",
-    title: "Kitchen Order Prepared",
-    message: "Mama T Stores dispatched 2 items for Ita Elewa delivery.",
-    meta: "Prep SLA: 12 mins",
-    time: "3 mins ago",
-  },
-  {
-    id: "notif-2",
-    recipient: "dispatch",
-    title: "Rider Assigned (Ita Elewa)",
-    message: "Rider Segun picked up parcel at Sabo Market for delivery to Agric.",
-    meta: "Est. delivery: 28 mins",
-    time: "10 mins ago",
-  },
-  {
-    id: "notif-3",
-    recipient: "admin",
-    title: "Daily Operations Status",
-    message: "All 18 verified Ikorodu kitchens and grocery stalls online & active.",
-    meta: "Platform Health: 100%",
-    time: "35 mins ago",
-  },
-];
+/**
+ * Format a notification's DB timestamp into a human-readable relative string.
+ * e.g. "3 mins ago", "2 hrs ago", "Yesterday"
+ */
+function formatNotifTime(isoString) {
+  if (!isoString) return "Just now";
+  try {
+    const diffMs = Date.now() - new Date(isoString).getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins} min${diffMins !== 1 ? "s" : ""} ago`;
+    const diffHrs = Math.floor(diffMins / 60);
+    if (diffHrs < 24) return `${diffHrs} hr${diffHrs !== 1 ? "s" : ""} ago`;
+    const diffDays = Math.floor(diffHrs / 24);
+    if (diffDays === 1) return "Yesterday";
+    return `${diffDays} days ago`;
+  } catch {
+    return "Just now";
+  }
+}
 
 export default function App() {
   const [screen, setScreen] = useState("home");
@@ -85,8 +82,10 @@ export default function App() {
   const [authModalMode, setAuthModalMode] = useState("login");
   const [notificationsModalOpen, setNotificationsModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
-  const [unreadCount, setUnreadCount] = useState(3);
+  // Onboarding modal: shown post-Google-OAuth when onboarding_complete = false
+  const [onboardingUser, setOnboardingUser] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Basket state with localStorage
   const [basket, setBasket] = useState(() => {
@@ -152,7 +151,32 @@ export default function App() {
         if (session?.user) {
           const profile = await getProfile(session.user.id);
           const user = buildUserObject(session, profile);
-          setCurrentUser(user);
+
+          // ── Onboarding gate ──────────────────────────────────────────────
+          // Google OAuth users arrive with onboarding_complete = false.
+          // Show the OnboardingModal before letting them into the app.
+          if (user && user.onboardingComplete === false) {
+            setOnboardingUser({ userId: user.id, name: user.fullName });
+            // Store partial user so header doesn't flash empty
+            setCurrentUser(user);
+          } else {
+            setCurrentUser(user);
+          }
+
+          // ── Load role-scoped notifications from DB ───────────────────────
+          // Only fetch notifications once we know the user's role.
+          // Do NOT load until onboarding is complete (role may be undefined).
+          if (user && user.onboardingComplete !== false && user.role) {
+            const notifs = await getSupabaseNotifications(user.role);
+            if (notifs && notifs.length > 0) {
+              setNotifications(notifs.map((n) => ({
+                ...n,
+                time: formatNotifTime(n.created_at),
+              })));
+            }
+            const count = await getUnreadNotificationCount(user.role);
+            setUnreadCount(count);
+          }
         } else {
           setCurrentUser(null);
         }
@@ -160,6 +184,10 @@ export default function App() {
 
       if (event === "SIGNED_OUT") {
         setCurrentUser(null);
+        setOnboardingUser(null);
+        // Clear notifications on sign-out so the next user starts fresh
+        setNotifications([]);
+        setUnreadCount(0);
       }
     });
 
@@ -170,6 +198,8 @@ export default function App() {
   const handleSignOut = async () => {
     await signOutUser();
     setCurrentUser(null);
+    setNotifications([]);
+    setUnreadCount(0);
     setToast({ tone: "info", icon: "user", title: "Signed out", message: "See you soon!" });
   };
 
@@ -252,9 +282,23 @@ export default function App() {
           setAuthModalOpen(true);
         }}
         onSignOut={handleSignOut}
-        onOpenNotifications={() => {
+        onOpenNotifications={async () => {
           setNotificationsModalOpen(true);
-          setUnreadCount(0);
+          // Mark all visible notifications as read in the DB
+          if (currentUser?.role) {
+            await markNotificationsRead();
+            setUnreadCount(0);
+            // Refresh the list so is_read flags are up to date
+            const notifs = await getSupabaseNotifications(currentUser.role);
+            if (notifs) {
+              setNotifications(notifs.map((n) => ({
+                ...n,
+                time: formatNotifTime(n.created_at),
+              })));
+            }
+          } else {
+            setUnreadCount(0);
+          }
         }}
         unreadNotificationsCount={unreadCount}
         currentUser={currentUser}
@@ -322,41 +366,56 @@ export default function App() {
               }
 
               const vendorNames = Array.from(new Set(order.items.map((i) => i.vendor))).filter(Boolean).join(", ");
-              const timeStr = "Just now";
               const newVendorNotif = {
-                id: `v-${Date.now()}`,
                 recipient: "vendor",
                 title: "Kitchen Order Alert",
                 message: `${order.items.length} item(s) ordered from ${vendorNames || "verified kitchens"}. Preparation started.`,
                 meta: `Total: ₦${order.total.toLocaleString("en-NG")} • ${order.phone}`,
-                time: timeStr,
               };
               const newDispatchNotif = {
-                id: `d-${Date.now()}`,
                 recipient: "dispatch",
                 title: "Dispatch Rider Assigned",
                 message: `Delivery assigned to zone rider for ${order.address}.`,
                 meta: `Customer: ${order.phone}`,
-                time: timeStr,
               };
               const newAdminNotif = {
-                id: `a-${Date.now()}`,
                 recipient: "admin",
                 title: "Operations Order Logged",
                 message: `Order of ₦${order.total.toLocaleString("en-NG")} confirmed via ${order.paymentMethod === "transfer" ? "Bank Transfer" : "Cash"}. SLA 35–60m active.`,
                 meta: `Ref: #OJ-${Math.floor(1000 + Math.random() * 9000)}`,
-                time: timeStr,
               };
 
-              // Persist notifications to Supabase
-              try {
-                await recordSupabaseNotification(newVendorNotif);
-                await recordSupabaseNotification(newDispatchNotif);
-                await recordSupabaseNotification(newAdminNotif);
-              } catch {}
+              // Persist role-scoped notifications to Supabase
+              if (currentUser?.id) {
+                // Only record if user is authenticated (RLS requires auth)
+                try {
+                  await Promise.all([
+                    recordSupabaseNotification(newVendorNotif),
+                    recordSupabaseNotification(newDispatchNotif),
+                    recordSupabaseNotification(newAdminNotif),
+                  ]);
+                } catch (err) {
+                  console.warn("Could not record notifications:", err);
+                }
 
-              setNotifications((prev) => [newVendorNotif, newDispatchNotif, newAdminNotif, ...prev]);
-              setUnreadCount((c) => c + 3);
+                // Refresh the current user's notification list from DB
+                // (they only see their own role's notifications)
+                if (currentUser.role) {
+                  const notifs = await getSupabaseNotifications(currentUser.role);
+                  if (notifs) {
+                    setNotifications(notifs.map((n) => ({ ...n, time: formatNotifTime(n.created_at) })));
+                  }
+                  const count = await getUnreadNotificationCount(currentUser.role);
+                  setUnreadCount(count);
+                }
+              } else {
+                // Not logged in — optimistic local-only update for the checkout toast
+                const timeStr = "Just now";
+                setNotifications((prev) => [
+                  { ...newAdminNotif, id: `a-${Date.now()}`, time: timeStr },
+                  ...prev,
+                ]);
+              }
 
               setToast({
                 tone: "success",
@@ -422,39 +481,42 @@ export default function App() {
       <BecomeVendorModal
         open={vendorModalOpen}
         onClose={() => setVendorModalOpen(false)}
+        currentUser={currentUser}
         onSubmitSuccess={async (vendorData) => {
-          // Persist vendor application to Supabase
-          try {
-            await submitSupabaseVendorApplication(vendorData, currentUser?.id || null);
-          } catch (err) {
-            console.info("Supabase vendor application sync:", err);
-          }
-
-          const timeStr = "Just now";
+          // DB write is already done inside BecomeVendorModal.
+          // Here we just record the role-scoped notifications.
           const vendorNotif = {
-            id: `v-app-${Date.now()}`,
             recipient: "vendor",
             title: "Store Application Submitted",
             message: `${vendorData.shopName} queued for physical onboarding inspection.`,
             meta: `Zone: ${vendorData.area}`,
-            time: timeStr,
           };
           const adminNotif = {
-            id: `a-app-${Date.now()}`,
             recipient: "admin",
             title: "New Vendor Application",
             message: `${vendorData.shopName} applied for verification in ${vendorData.area}.`,
             meta: `Contact: ${vendorData.phone}`,
-            time: timeStr,
           };
 
-          try {
-            await recordSupabaseNotification(vendorNotif);
-            await recordSupabaseNotification(adminNotif);
-          } catch {}
+          if (currentUser?.id) {
+            try {
+              await Promise.all([
+                recordSupabaseNotification(vendorNotif),
+                recordSupabaseNotification(adminNotif),
+              ]);
+            } catch (err) {
+              console.warn("Could not record vendor application notifications:", err);
+            }
 
-          setNotifications((prev) => [vendorNotif, adminNotif, ...prev]);
-          setUnreadCount((c) => c + 2);
+            if (currentUser.role) {
+              const notifs = await getSupabaseNotifications(currentUser.role);
+              if (notifs) {
+                setNotifications(notifs.map((n) => ({ ...n, time: formatNotifTime(n.created_at) })));
+              }
+              const count = await getUnreadNotificationCount(currentUser.role);
+              setUnreadCount(count);
+            }
+          }
 
           setToast({
             tone: "success",
@@ -492,6 +554,30 @@ export default function App() {
           setUnreadCount(0);
         }}
       />
+
+      {/* ── OnboardingModal (post-Google-OAuth role wizard) ─────────────── */}
+      {onboardingUser && (
+        <OnboardingModal
+          userId={onboardingUser.userId}
+          name={onboardingUser.name}
+          onDone={(updatedProfile) => {
+            // Reload user with the fresh profile data from the DB
+            setCurrentUser((prev) => ({
+              ...prev,
+              role: updatedProfile.role || "customer",
+              vendorStoreName: updatedProfile.vendor_store_name || null,
+              onboardingComplete: true,
+            }));
+            setOnboardingUser(null);
+            setToast({
+              tone: "success",
+              icon: "check-circle",
+              title: "Setup complete!",
+              message: `Welcome to Ojawa. Your role: ${updatedProfile.role || "customer"}.`,
+            });
+          }}
+        />
+      )}
 
       <style>{`
         @keyframes oj-toast-in {
