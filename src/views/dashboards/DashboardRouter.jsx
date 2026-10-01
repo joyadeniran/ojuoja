@@ -69,6 +69,27 @@ export function DashboardRouter({ currentUser, onNav, onSignOut, onOpenAuth, fav
         />
       );
 
+    case "suspended":
+      return (
+        <div style={{
+          maxWidth: 440, margin: "80px auto", padding: "0 24px",
+          display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 20,
+        }}>
+          <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#fee2e2", color: "#991b1b", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Icon name="slash" size={32} />
+          </div>
+          <div>
+            <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 22, color: "#991b1b", margin: "0 0 8px" }}>
+              Account Suspended
+            </h2>
+            <p style={{ margin: "0 0 16px", color: "var(--text-muted)", fontSize: 15, lineHeight: 1.5 }}>
+              Your account has been suspended. Please contact Ojawa support for assistance.
+            </p>
+          </div>
+          <Button variant="ghost" onClick={onSignOut}>Sign Out</Button>
+        </div>
+      );
+
     case "customer":
     default:
       return (

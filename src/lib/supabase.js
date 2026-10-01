@@ -106,6 +106,10 @@ export function buildUserObject(session, profile) {
     role: profile?.role || "customer",
     avatarUrl: profile?.avatar_url || metaAvatar || "",
     provider: user.app_metadata?.provider || "email",
+    // Onboarding gate — false means the OnboardingModal must be shown
+    onboardingComplete: profile?.onboarding_complete ?? true,
+    // Vendor-specific: the exact store name used to match against order items
+    vendorStoreName: profile?.vendor_store_name || null,
   };
 }
 
@@ -365,22 +369,111 @@ export async function submitVendorApplication(vendorPayload, userId = null) {
 // DATA: NOTIFICATIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function getNotifications() {
+// ─────────────────────────────────────────────────────────────────────────────
+// DATA: NOTIFICATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Fetch notifications scoped to the current user's role.
+ *
+ * - admin: sees ALL notifications (no filter)
+ * - vendor / dispatch / customer: sees only notifications where
+ *     recipient = their role  OR  recipient = 'all'  OR  user_id = their uid
+ *
+ * Returns null on error or when unauthenticated.
+ */
+export async function getNotifications(userRole) {
   try {
-    const { data, error } = await supabase
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !userRole) return null;
+
+    let query = supabase
       .from("notifications")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(100);
 
-    if (error || !data || data.length === 0) return null;
-    return data;
-  } catch {
+    // Admins see everything; RLS enforces this server-side too.
+    // For non-admins the RLS policy already gates rows, but we also
+    // add a client-side filter as defence-in-depth.
+    if (userRole !== "admin") {
+      query = query.or(`recipient.eq.${userRole},recipient.eq.all,user_id.eq.${user.id}`);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.warn("Could not fetch notifications:", error.message);
+      return null;
+    }
+    return data || [];
+  } catch (err) {
+    console.warn("getNotifications error:", err);
     return null;
   }
 }
 
+/**
+ * Returns the count of unread notifications for the current user's role.
+ * Used to drive the notification bell badge.
+ */
+export async function getUnreadNotificationCount(userRole) {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !userRole) return 0;
+
+    let query = supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("is_read", false);
+
+    if (userRole !== "admin") {
+      query = query.or(`recipient.eq.${userRole},recipient.eq.all,user_id.eq.${user.id}`);
+    }
+
+    const { count, error } = await query;
+    if (error) return 0;
+    return count || 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Mark notifications as read for the current user.
+ * Pass an array of notification IDs, or omit to mark all visible ones as read.
+ */
+export async function markNotificationsRead(ids = []) {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: "Not authenticated" };
+
+    let query = supabase
+      .from("notifications")
+      .update({ is_read: true });
+
+    if (ids.length > 0) {
+      query = query.in("id", ids);
+    }
+    // RLS UPDATE policy ensures the user can only mark their own-role notifications
+    const { error } = await query;
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Record a new notification. Requires the caller to be authenticated.
+ * recipient: 'vendor' | 'dispatch' | 'admin' | 'customer' | 'all'
+ * userId (optional): target a specific user in addition to the role
+ */
 export async function recordNotification(notifPayload) {
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    // Require auth — anonymous notification inserts are blocked by RLS
+    if (!user) return { success: false, error: "Not authenticated" };
+
     const { data, error } = await supabase
       .from("notifications")
       .insert([
@@ -388,7 +481,9 @@ export async function recordNotification(notifPayload) {
           recipient: notifPayload.recipient,
           title: notifPayload.title,
           message: notifPayload.message,
-          meta: notifPayload.meta,
+          meta: notifPayload.meta || null,
+          user_id: notifPayload.userId || null,
+          is_read: false,
           created_at: new Date().toISOString(),
         },
       ])
@@ -452,6 +547,18 @@ export async function updateProfileRole(userId, role) {
     .single();
   if (error) return { success: false, error: error.message };
   return { success: true, data };
+}
+
+/** Admin: suspend (disable) a user by setting role to 'suspended'.
+ *  The DashboardRouter and all data helpers treat 'suspended' as no-access.
+ */
+export async function suspendProfile(userId) {
+  return updateProfileRole(userId, "suspended");
+}
+
+/** Admin: restore (unsuspend) a user by resetting their role to 'customer'. */
+export async function restoreProfile(userId) {
+  return updateProfileRole(userId, "customer");
 }
 
 /** Admin: fetch all orders across the platform */

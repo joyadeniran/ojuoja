@@ -138,12 +138,18 @@ export function VendorDashboard({ currentUser, onNav, onSignOut }) {
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
 
-  // Derive vendor record from the user's full_name matching vendor data
-  const vendorRecord = VENDORS.find(
-    (v) => v.name.toLowerCase() === (currentUser?.fullName || "").toLowerCase()
-  ) || VENDORS[0]; // Fallback for demo
+  // Prefer the explicit store name stored in the profile (set during onboarding).
+  // Fall back to fullName for demo / pre-onboarding accounts.
+  const vendorName =
+    currentUser?.vendorStoreName ||
+    currentUser?.fullName ||
+    VENDORS[0]?.name ||
+    "My Store";
 
-  const vendorName = currentUser?.fullName || vendorRecord?.name || "My Store";
+  // Find the matching vendor record for store settings (by store name, then fallback)
+  const vendorRecord =
+    VENDORS.find((v) => v.name.toLowerCase() === vendorName.toLowerCase()) ||
+    VENDORS[0];
 
   useEffect(() => {
     Promise.all([

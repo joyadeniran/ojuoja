@@ -6,6 +6,8 @@ import {
   getPlatformStats,
   getAllProfiles,
   updateProfileRole,
+  suspendProfile,
+  restoreProfile,
   getAllOrders,
   updateOrderStatus,
   getAllVendorApplications,
@@ -99,7 +101,7 @@ function StatusPill({ status }) {
 }
 
 // ── Users Table ───────────────────────────────────────────────────────────────
-function UsersSection({ users, onRoleChange, loading }) {
+function UsersSection({ users, onRoleChange, onSuspend, onRestore, loading }) {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
 
@@ -126,6 +128,7 @@ function UsersSection({ users, onRoleChange, loading }) {
             <option value="vendor">Vendor</option>
             <option value="dispatch">Dispatch</option>
             <option value="admin">Admin</option>
+            <option value="suspended">Suspended</option>
           </select>
         </div>
       }
@@ -137,39 +140,85 @@ function UsersSection({ users, onRoleChange, loading }) {
       ) : (
         <>
           {/* Table header */}
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr", gap: 12, padding: "10px 24px", background: "var(--surface-sunken)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-faint)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1.6fr", gap: 12, padding: "10px 24px", background: "var(--surface-sunken)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-faint)" }}>
             <div>Name / Email</div><div>Provider</div><div>Role</div><div>Actions</div>
           </div>
           {filtered.map((user, idx) => {
+            const isSuspended = user.role === "suspended";
             const rb = ROLE_BADGE[user.role] || ROLE_BADGE.customer;
             return (
               <div key={user.id} style={{
-                display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr", gap: 12,
+                display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1.6fr", gap: 12,
                 alignItems: "center", padding: "14px 24px",
                 borderTop: "1px solid var(--border-subtle)",
-                background: idx % 2 === 0 ? "transparent" : "var(--surface-sunken)",
+                background: isSuspended
+                  ? "#fff0f0"
+                  : idx % 2 === 0 ? "transparent" : "var(--surface-sunken)",
+                opacity: isSuspended ? 0.75 : 1,
               }}>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: 14, color: "var(--text-heading)" }}>{user.full_name || "—"}</div>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: "var(--text-heading)", display: "flex", alignItems: "center", gap: 6 }}>
+                    {user.full_name || "—"}
+                    {isSuspended && (
+                      <span style={{ fontSize: 10, fontWeight: 700, background: "#fee2e2", color: "#991b1b", padding: "2px 6px", borderRadius: 99 }}>SUSPENDED</span>
+                    )}
+                  </div>
                   <div style={{ fontSize: 12, color: "var(--text-faint)" }}>{user.email || user.phone || "—"}</div>
                 </div>
                 <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
                   {user.avatar_url?.includes("google") ? "Google" : "Email / Phone"}
                 </div>
                 <div>
-                  <Badge tone={rb.tone} icon={rb.icon}>{user.role}</Badge>
+                  {!isSuspended && <Badge tone={rb.tone} icon={rb.icon}>{user.role}</Badge>}
+                  {isSuspended && <Badge tone="danger" icon="slash">suspended</Badge>}
                 </div>
-                <div>
-                  <select
-                    value={user.role}
-                    onChange={(e) => onRoleChange(user.id, e.target.value)}
-                    style={{ padding: "5px 8px", border: "1px solid var(--border-input)", borderRadius: 8, fontSize: 12, outline: "none", fontFamily: "var(--font-body)", background: "#fff", cursor: "pointer" }}
-                  >
-                    <option value="customer">Customer</option>
-                    <option value="vendor">Vendor</option>
-                    <option value="dispatch">Dispatch</option>
-                    <option value="admin">Admin</option>
-                  </select>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  {!isSuspended && (
+                    <>
+                      <select
+                        value={user.role}
+                        onChange={(e) => onRoleChange(user.id, e.target.value)}
+                        style={{ padding: "5px 8px", border: "1px solid var(--border-input)", borderRadius: 8, fontSize: 12, outline: "none", fontFamily: "var(--font-body)", background: "#fff", cursor: "pointer" }}
+                      >
+                        <option value="customer">Customer</option>
+                        <option value="vendor">Vendor</option>
+                        <option value="dispatch">Dispatch</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Suspend ${user.full_name || user.email}? They will lose access immediately.`)) {
+                            onSuspend(user.id);
+                          }
+                        }}
+                        title="Suspend user"
+                        style={{
+                          padding: "5px 8px", border: "1px solid #fecaca",
+                          borderRadius: 8, background: "#fff0f0",
+                          color: "#c0392b", fontSize: 11, fontWeight: 700,
+                          cursor: "pointer", whiteSpace: "nowrap",
+                          fontFamily: "var(--font-body)",
+                        }}
+                      >
+                        🚫 Suspend
+                      </button>
+                    </>
+                  )}
+                  {isSuspended && (
+                    <button
+                      onClick={() => onRestore(user.id)}
+                      title="Restore user"
+                      style={{
+                        padding: "5px 12px", border: "1px solid var(--border-subtle)",
+                        borderRadius: 8, background: "var(--surface-lime)",
+                        color: "var(--oj-green-900)", fontSize: 11, fontWeight: 700,
+                        cursor: "pointer", whiteSpace: "nowrap",
+                        fontFamily: "var(--font-body)",
+                      }}
+                    >
+                      ✓ Restore
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -338,6 +387,20 @@ export function AdminDashboard({ currentUser, onNav, onSignOut }) {
     }
   }, []);
 
+  const handleSuspend = useCallback(async (userId) => {
+    const result = await suspendProfile(userId);
+    if (result.success) {
+      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: "suspended" } : u));
+    }
+  }, []);
+
+  const handleRestore = useCallback(async (userId) => {
+    const result = await restoreProfile(userId);
+    if (result.success) {
+      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: "customer" } : u));
+    }
+  }, []);
+
   const handleOrderStatusChange = useCallback(async (orderId, status) => {
     const result = await updateOrderStatus(orderId, status);
     if (result.success) {
@@ -467,7 +530,13 @@ export function AdminDashboard({ currentUser, onNav, onSignOut }) {
 
       {/* USERS TAB */}
       {activeTab === "users" && (
-        <UsersSection users={users} onRoleChange={handleRoleChange} loading={loading.users} />
+        <UsersSection
+          users={users}
+          onRoleChange={handleRoleChange}
+          onSuspend={handleSuspend}
+          onRestore={handleRestore}
+          loading={loading.users}
+        />
       )}
 
       {/* ORDERS TAB */}

@@ -14,21 +14,32 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 --    One row per authenticated user. Created automatically on sign-up via trigger.
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.profiles (
-  id          UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  full_name   TEXT,
-  email       TEXT,
-  phone       TEXT,
-  role        TEXT NOT NULL DEFAULT 'customer', -- 'customer' | 'vendor' | 'dispatch' | 'admin'
-  avatar_url  TEXT,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                   UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  full_name            TEXT,
+  email                TEXT,
+  phone                TEXT,
+  role                 TEXT NOT NULL DEFAULT 'customer',
+  -- Allowed values: 'customer' | 'vendor' | 'dispatch' | 'admin' | 'suspended'
+  avatar_url           TEXT,
+  -- Onboarding: false for Google OAuth users until they pick a role
+  onboarding_complete  BOOLEAN NOT NULL DEFAULT false,
+  -- Vendor-specific: exact store name used to match order items
+  vendor_store_name    TEXT,
+  -- Optional link to public.vendors row
+  vendor_id            TEXT REFERENCES public.vendors(id) ON DELETE SET NULL,
+  -- Customer preference
+  preferred_area       TEXT,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
+-- Profiles: users can only read their own profile; admins can read all.
+-- (The "Admins can read all profiles" policy added later replaces the need for a
+--  public-read policy. We intentionally do NOT expose all profiles to everyone.)
 DROP POLICY IF EXISTS "Profiles are publicly readable" ON public.profiles;
-CREATE POLICY "Profiles are publicly readable"
-  ON public.profiles FOR SELECT USING (true);
+-- (No replacement — admin+self read is handled by the policy created further below)
 
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can update own profile"
@@ -37,6 +48,11 @@ CREATE POLICY "Users can update own profile"
 DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 CREATE POLICY "Users can insert own profile"
   ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
+
+-- Allow users to read their own profile (base policy; admin extension added below)
+DROP POLICY IF EXISTS "Users can read own profile" ON public.profiles;
+CREATE POLICY "Users can read own profile"
+  ON public.profiles FOR SELECT USING (auth.uid() = id);
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 1a. TRIGGER: Auto-create profile row on new user sign-up
@@ -47,21 +63,43 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  v_provider TEXT;
+  v_role     TEXT;
+  v_onboarded BOOLEAN;
 BEGIN
-  INSERT INTO public.profiles (id, full_name, email, phone, role, avatar_url)
+  -- Detect the auth provider from app_metadata
+  v_provider := COALESCE(NEW.raw_app_meta_data->>'provider', 'email');
+
+  -- For Google OAuth: default role='customer', onboarding_complete=false
+  -- (user will be shown OnboardingModal to pick their real role)
+  -- For email/phone: role comes from raw_user_meta_data, onboarding is already done
+  IF v_provider = 'google' THEN
+    v_role     := 'customer';
+    v_onboarded := false;
+  ELSE
+    v_role     := COALESCE(NEW.raw_user_meta_data->>'role', 'customer');
+    v_onboarded := true;
+  END IF;
+
+  INSERT INTO public.profiles (
+    id, full_name, email, phone, role, avatar_url, onboarding_complete
+  )
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', ''),
     COALESCE(NEW.email, NEW.raw_user_meta_data->>'email', ''),
     COALESCE(NEW.phone, NEW.raw_user_meta_data->>'phone', ''),
-    COALESCE(NEW.raw_user_meta_data->>'role', 'customer'),
-    COALESCE(NEW.raw_user_meta_data->>'avatar_url', NEW.raw_user_meta_data->>'picture', '')
+    v_role,
+    COALESCE(NEW.raw_user_meta_data->>'avatar_url', NEW.raw_user_meta_data->>'picture', ''),
+    v_onboarded
   )
   ON CONFLICT (id) DO UPDATE SET
     full_name  = EXCLUDED.full_name,
     email      = EXCLUDED.email,
     phone      = EXCLUDED.phone,
     avatar_url = EXCLUDED.avatar_url,
+    -- Do NOT overwrite role or onboarding_complete on subsequent logins
     updated_at = NOW();
   RETURN NEW;
 END;
@@ -71,6 +109,39 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 1b. MIGRATION: Add new columns to existing profiles table (idempotent)
+--     Run this if the table already exists from a previous schema version.
+-- ─────────────────────────────────────────────────────────────────────────────
+DO $$
+BEGIN
+  -- onboarding_complete: false for new Google OAuth users; true for email/phone
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='profiles' AND column_name='onboarding_complete') THEN
+    ALTER TABLE public.profiles ADD COLUMN onboarding_complete BOOLEAN NOT NULL DEFAULT false;
+    -- Existing users who are already using the platform are already onboarded
+    UPDATE public.profiles SET onboarding_complete = true WHERE onboarding_complete = false;
+  END IF;
+
+  -- vendor_store_name: set during vendor onboarding, used for exact order matching
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='profiles' AND column_name='vendor_store_name') THEN
+    ALTER TABLE public.profiles ADD COLUMN vendor_store_name TEXT;
+  END IF;
+
+  -- vendor_id: optional link to the vendors table
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='profiles' AND column_name='vendor_id') THEN
+    ALTER TABLE public.profiles ADD COLUMN vendor_id TEXT;
+  END IF;
+
+  -- preferred_area: customer delivery preference
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='profiles' AND column_name='preferred_area') THEN
+    ALTER TABLE public.profiles ADD COLUMN preferred_area TEXT;
+  END IF;
+END $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2. VENDORS TABLE
@@ -95,9 +166,13 @@ DROP POLICY IF EXISTS "Public can view verified vendors" ON public.vendors;
 CREATE POLICY "Public can view verified vendors"
   ON public.vendors FOR SELECT USING (true);
 
+-- Vendors: only the owner or an admin can INSERT/UPDATE/DELETE their own vendor record
 DROP POLICY IF EXISTS "Authenticated users can manage vendors" ON public.vendors;
-CREATE POLICY "Authenticated users can manage vendors"
-  ON public.vendors FOR ALL USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Vendor owners can manage own vendor" ON public.vendors;
+CREATE POLICY "Vendor owners can manage own vendor"
+  ON public.vendors FOR ALL USING (
+    public.is_admin() OR auth.uid() = owner_id
+  );
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 3. PRODUCTS TABLE
@@ -129,9 +204,21 @@ DROP POLICY IF EXISTS "Public can view products" ON public.products;
 CREATE POLICY "Public can view products"
   ON public.products FOR SELECT USING (true);
 
+-- Products: only admins or the vendor who owns the product can write.
+-- Ownership: products.vendor_id must match the vendor record whose owner_id = auth.uid()
 DROP POLICY IF EXISTS "Authenticated users can manage products" ON public.products;
-CREATE POLICY "Authenticated users can manage products"
-  ON public.products FOR ALL USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Vendors can manage own products" ON public.products;
+CREATE POLICY "Vendors can manage own products"
+  ON public.products FOR ALL USING (
+    public.is_admin() OR (
+      auth.uid() IS NOT NULL AND
+      EXISTS (
+        SELECT 1 FROM public.vendors v
+        WHERE v.id = products.vendor_id
+          AND v.owner_id = auth.uid()
+      )
+    )
+  );
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 4. ORDERS TABLE
@@ -180,37 +267,73 @@ CREATE TABLE IF NOT EXISTS public.vendor_applications (
 
 ALTER TABLE public.vendor_applications ENABLE ROW LEVEL SECURITY;
 
+-- vendor_applications: authenticated users can submit; applicants can read own submission; admins manage all
 DROP POLICY IF EXISTS "Public can submit applications" ON public.vendor_applications;
 CREATE POLICY "Public can submit applications"
-  ON public.vendor_applications FOR INSERT WITH CHECK (true);
+  ON public.vendor_applications FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
 DROP POLICY IF EXISTS "Authenticated can read applications" ON public.vendor_applications;
-CREATE POLICY "Authenticated can read applications"
-  ON public.vendor_applications FOR SELECT USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Applicants can read own application" ON public.vendor_applications;
+CREATE POLICY "Applicants can read own application"
+  ON public.vendor_applications FOR SELECT USING (
+    public.is_admin() OR auth.uid() = applicant_id
+  );
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 6. NOTIFICATIONS TABLE
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.notifications (
   id         BIGSERIAL PRIMARY KEY,
-  recipient  TEXT NOT NULL, -- 'vendor' | 'dispatch' | 'admin' | 'all'
+  recipient  TEXT NOT NULL, -- 'vendor' | 'dispatch' | 'admin' | 'customer' | 'all'
   title      TEXT NOT NULL,
   message    TEXT NOT NULL,
   meta       TEXT,
   is_read    BOOLEAN DEFAULT false,
-  user_id    UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  -- Optional: target a specific user (for personal notifications)
+  user_id    UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
+-- Notifications SELECT: a user can read a notification only if:
+--   1. They are an admin (see everything), OR
+--   2. The notification's recipient matches their own role in public.profiles, OR
+--   3. The notification is addressed specifically to their user_id, OR
+--   4. The recipient is 'all'
 DROP POLICY IF EXISTS "Public can view notifications" ON public.notifications;
-CREATE POLICY "Public can view notifications"
-  ON public.notifications FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Users can view own role notifications" ON public.notifications;
+CREATE POLICY "Users can view own role notifications"
+  ON public.notifications FOR SELECT USING (
+    public.is_admin()
+    OR recipient = 'all'
+    OR user_id = auth.uid()
+    OR recipient = (
+      SELECT role FROM public.profiles WHERE id = auth.uid() LIMIT 1
+    )
+  );
 
+-- Notifications INSERT: only authenticated users (no anonymous inserts)
 DROP POLICY IF EXISTS "Public can insert notifications" ON public.notifications;
-CREATE POLICY "Public can insert notifications"
-  ON public.notifications FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Authenticated users can insert notifications" ON public.notifications;
+CREATE POLICY "Authenticated users can insert notifications"
+  ON public.notifications FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+
+-- Notifications UPDATE: users can mark their own notifications read; admins update any
+DROP POLICY IF EXISTS "Users can mark own notifications read" ON public.notifications;
+CREATE POLICY "Users can mark own notifications read"
+  ON public.notifications FOR UPDATE USING (
+    public.is_admin()
+    OR user_id = auth.uid()
+    OR recipient = (
+      SELECT role FROM public.profiles WHERE id = auth.uid() LIMIT 1
+    )
+  );
+
+-- Notifications DELETE: admins only
+DROP POLICY IF EXISTS "Admins can delete notifications" ON public.notifications;
+CREATE POLICY "Admins can delete notifications"
+  ON public.notifications FOR DELETE USING (public.is_admin());
 
 -- ==============================================================================
 -- SEED DATA (safe — uses ON CONFLICT DO NOTHING)
@@ -225,12 +348,9 @@ VALUES
   ('ebute-chill', 'Ebute Chill & Mart', 'Ebute', true, 4.8, 35, 'Chilled beverages & refreshments', 'Ice-cold malt drinks, carbonated soft drinks, table water packs, and chilled zobo extracts delivered fast.')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.notifications (recipient, title, message, meta, created_at)
-VALUES
-  ('vendor', 'Kitchen Order Prepared', 'Mama T Stores dispatched 2 items for Ita Elewa delivery.', 'Prep SLA: 12 mins', NOW() - INTERVAL '3 minutes'),
-  ('dispatch', 'Rider Assigned (Ita Elewa)', 'Rider Segun picked up parcel at Sabo Market for delivery to Agric.', 'Est. delivery: 28 mins', NOW() - INTERVAL '10 minutes'),
-  ('admin', 'Daily Operations Status', 'All 18 verified Ikorodu kitchens and grocery stalls online & active.', 'Platform Health: 100%', NOW() - INTERVAL '35 minutes')
-ON CONFLICT DO NOTHING;
+-- Seed notifications removed from schema — notifications are now runtime-generated only.
+-- The RLS policy gates them per-role. Inserting seed data here would require
+-- known user UUIDs which are not available at schema creation time.
 
 -- ==============================================================================
 -- ROLE HELPER FUNCTIONS (SECURITY DEFINER — bypasses RLS for the check itself)
@@ -264,7 +384,8 @@ $$;
 -- REFINED RLS — ADMIN OVERRIDES
 -- ==============================================================================
 
--- profiles: admins can read ALL profiles (for user management)
+-- profiles: admins can read ALL profiles (for user management).
+-- This supersedes the "Users can read own profile" base policy for admins.
 DROP POLICY IF EXISTS "Admins can read all profiles" ON public.profiles;
 CREATE POLICY "Admins can read all profiles"
   ON public.profiles FOR SELECT USING (public.is_admin() OR auth.uid() = id);
@@ -289,10 +410,9 @@ DROP POLICY IF EXISTS "Admins can manage applications" ON public.vendor_applicat
 CREATE POLICY "Admins can manage applications"
   ON public.vendor_applications FOR ALL USING (public.is_admin());
 
--- notifications: admins can see all
+-- notifications: admin visibility is already handled by the "Users can view own role notifications" policy
+-- (which checks public.is_admin() first). No separate admin override needed.
 DROP POLICY IF EXISTS "Admins can view all notifications" ON public.notifications;
-CREATE POLICY "Admins can view all notifications"
-  ON public.notifications FOR SELECT USING (public.is_admin() OR true);
 
 -- ==============================================================================
 -- 7. VENDOR STORE SETTINGS TABLE

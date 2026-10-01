@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Dialog } from "../../../components/feedback/Dialog.jsx";
 import { Button } from "../../../components/core/Button.jsx";
 import { Input } from "../../../components/forms/Input.jsx";
@@ -11,7 +11,7 @@ import {
   updatePassword,
 } from "../../lib/supabase.js";
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 const GoogleLogo = () => (
   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
@@ -29,46 +29,34 @@ const Divider = ({ label = "or continue with email" }) => (
   </div>
 );
 
-const SuccessScreen = ({ title, message }) => (
+const SuccessScreen = ({ icon = "check", title, message, children }) => (
   <div style={{ textAlign: "center", padding: "28px 0" }}>
-    <div
-      style={{
-        width: 52,
-        height: 52,
-        borderRadius: "50%",
-        background: "var(--surface-lime)",
-        color: "var(--oj-green-900)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        margin: "0 auto 16px",
-      }}
-    >
-      <Icon name="check" size={24} />
+    <div style={{
+      width: 52, height: 52, borderRadius: "50%",
+      background: "var(--surface-lime)", color: "var(--oj-green-900)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      margin: "0 auto 16px",
+    }}>
+      <Icon name={icon} size={24} />
     </div>
     <h3 style={{ margin: "0 0 6px", color: "var(--text-heading)", fontFamily: "var(--font-display)" }}>
       {title}
     </h3>
-    <p style={{ margin: 0, color: "var(--text-muted)", fontSize: 14 }}>{message}</p>
+    <p style={{ margin: "0 0 16px", color: "var(--text-muted)", fontSize: 14, lineHeight: 1.5 }}>{message}</p>
+    {children}
   </div>
 );
 
 const ErrorBanner = ({ message }) =>
   message ? (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "flex-start",
-        gap: 8,
-        padding: "10px 12px",
-        borderRadius: "var(--radius-sm)",
-        background: "var(--surface-danger-soft, #fef2f2)",
-        border: "1px solid var(--color-danger-light, #fecaca)",
-        color: "var(--color-danger, #dc2626)",
-        fontSize: 13,
-        lineHeight: 1.4,
-      }}
-    >
+    <div style={{
+      display: "flex", alignItems: "flex-start", gap: 8,
+      padding: "10px 12px", borderRadius: "var(--radius-sm)",
+      background: "var(--surface-danger-soft, #fef2f2)",
+      border: "1px solid var(--color-danger-light, #fecaca)",
+      color: "var(--color-danger, #dc2626)",
+      fontSize: 13, lineHeight: 1.4,
+    }}>
       <Icon name="alert-circle" size={15} style={{ flexShrink: 0, marginTop: 1 }} />
       <span>{message}</span>
     </div>
@@ -83,6 +71,9 @@ const ErrorBanner = ({ message }) =>
  *   "forgot"         — request password-reset email
  *   "forgot-sent"    — reset email sent confirmation
  *   "reset-update"   — enter + confirm new password (after recovery link)
+ *
+ * `initialMode` is re-synced via useEffect so that when App.jsx sets
+ * authModalMode = "reset-update" and re-opens the modal, the mode switches correctly.
  */
 export function AuthModal({ open, onClose, onAuthSuccess, initialMode = "login" }) {
   const [role, setRole] = useState("customer");
@@ -97,6 +88,15 @@ export function AuthModal({ open, onClose, onAuthSuccess, initialMode = "login" 
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
+  // Sync mode when the parent changes initialMode (e.g., for reset-update)
+  useEffect(() => {
+    if (open) {
+      setMode(initialMode);
+      setError("");
+      setSuccessMsg("");
+    }
+  }, [initialMode, open]);
+
   const resetState = () => {
     setError("");
     setSuccessMsg("");
@@ -104,6 +104,8 @@ export function AuthModal({ open, onClose, onAuthSuccess, initialMode = "login" 
 
   const switchMode = (next) => {
     resetState();
+    setPassword("");
+    setConfirmPassword("");
     setMode(next);
   };
 
@@ -124,7 +126,7 @@ export function AuthModal({ open, onClose, onAuthSuccess, initialMode = "login" 
     e.preventDefault();
     resetState();
 
-    const identifier = email || phone;
+    const identifier = email.trim() || phone.trim();
     if (!identifier) {
       setError("Please enter your email address.");
       return;
@@ -134,23 +136,28 @@ export function AuthModal({ open, onClose, onAuthSuccess, initialMode = "login" 
       return;
     }
 
-    setLoading(true);
-
     if (mode === "signup") {
+      if (!fullName.trim()) {
+        setError("Please enter your full name.");
+        return;
+      }
       if (password.length < 6) {
         setError("Password must be at least 6 characters.");
-        setLoading(false);
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError("Passwords do not match.");
         return;
       }
 
+      setLoading(true);
       const { error: signUpError } = await signUpUser({
-        email: email || undefined,
-        phone: phone || undefined,
+        email: email.trim() || undefined,
+        phone: phone.trim() || undefined,
         password,
-        fullName: fullName || "Ojawa Member",
+        fullName: fullName.trim(),
         role,
       });
-
       setLoading(false);
 
       if (signUpError) {
@@ -158,29 +165,37 @@ export function AuthModal({ open, onClose, onAuthSuccess, initialMode = "login" 
         return;
       }
 
-      // Supabase may require email confirmation — show a friendly message.
-      // The onAuthStateChange in App.jsx will fire SIGNED_IN once confirmed.
+      // Show the email-confirmation prompt.
+      // onAuthStateChange in App.jsx fires SIGNED_IN once the user confirms.
       setSuccessMsg("account-created");
     } else {
-      const { user, session, error: signInError } = await signInUser({
-        email: email || undefined,
-        phone: phone || undefined,
+      setLoading(true);
+      const { user, error: signInError } = await signInUser({
+        email: email.trim() || undefined,
+        phone: phone.trim() || undefined,
         password,
       });
-
       setLoading(false);
 
       if (signInError) {
-        setError(signInError);
+        // Surface a friendly message for the most common errors
+        if (
+          signInError.toLowerCase().includes("invalid login") ||
+          signInError.toLowerCase().includes("invalid credentials") ||
+          signInError.toLowerCase().includes("email not confirmed")
+        ) {
+          setError("Incorrect email or password. If you just signed up, please check your email to confirm your account first.");
+        } else {
+          setError(signInError);
+        }
         return;
       }
 
-      // onAuthStateChange in App.jsx will handle setCurrentUser
-      // We also call onAuthSuccess here as a direct callback path
+      // onAuthStateChange in App.jsx handles setCurrentUser.
+      // Call the success callback and close.
       if (onAuthSuccess && user) {
-        onAuthSuccess({ id: user.id, email: user.email, fullName: fullName || user.email });
+        onAuthSuccess({ id: user.id, email: user.email, fullName: user.user_metadata?.full_name || email });
       }
-
       setSuccessMsg("signed-in");
     }
   };
@@ -190,13 +205,18 @@ export function AuthModal({ open, onClose, onAuthSuccess, initialMode = "login" 
     e.preventDefault();
     resetState();
 
-    if (!email) {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
       setError("Please enter your email address.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError("Please enter a valid email address.");
       return;
     }
 
     setLoading(true);
-    const { success, error: resetError } = await sendPasswordReset(email);
+    const { success, error: resetError } = await sendPasswordReset(trimmedEmail);
     setLoading(false);
 
     if (!success) {
@@ -233,28 +253,19 @@ export function AuthModal({ open, onClose, onAuthSuccess, initialMode = "login" 
     setSuccessMsg("password-updated");
   };
 
-  // ── Title map ────────────────────────────────────────────────────────────────
-  const titleMap = {
-    login: "Log in to Ojawa",
-    signup: "Join Ojawa Marketplace",
-    forgot: "Reset your password",
-    "forgot-sent": "Check your email",
-    "reset-update": "Set new password",
-  };
-
   // ── Success screens ──────────────────────────────────────────────────────────
-  const isSuccessScreen =
-    successMsg === "account-created" ||
-    successMsg === "signed-in" ||
-    successMsg === "password-updated";
-
   if (successMsg === "account-created") {
     return (
-      <Dialog open={open} onClose={onClose} title="Welcome to Ojawa!">
+      <Dialog open={open} onClose={onClose} title="Check your email">
         <SuccessScreen
-          title="Account created!"
-          message="Check your email to confirm your address, then log in to start shopping."
-        />
+          icon="mail"
+          title="Confirm your email"
+          message={`We've sent a confirmation link to ${email || "your email"}. Click it to activate your account, then come back to log in.`}
+        >
+          <Button variant="ghost" size="sm" onClick={() => { setSuccessMsg(""); switchMode("login"); }}>
+            Back to Login
+          </Button>
+        </SuccessScreen>
       </Dialog>
     );
   }
@@ -265,7 +276,11 @@ export function AuthModal({ open, onClose, onAuthSuccess, initialMode = "login" 
         <SuccessScreen
           title="Logged in!"
           message="Welcome to Ikorodu's verified marketplace."
-        />
+        >
+          <Button variant="primary" size="sm" onClick={onClose}>
+            Continue Shopping
+          </Button>
+        </SuccessScreen>
       </Dialog>
     );
   }
@@ -276,7 +291,11 @@ export function AuthModal({ open, onClose, onAuthSuccess, initialMode = "login" 
         <SuccessScreen
           title="Password updated!"
           message="Your new password is active. You can now log in."
-        />
+        >
+          <Button variant="primary" size="sm" onClick={() => { setSuccessMsg(""); switchMode("login"); }}>
+            Log In
+          </Button>
+        </SuccessScreen>
       </Dialog>
     );
   }
@@ -291,13 +310,16 @@ export function AuthModal({ open, onClose, onAuthSuccess, initialMode = "login" 
         footer={
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
             <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
-            <Button variant="primary" size="sm" onClick={handleUpdatePassword} disabled={loading}>
+            <Button variant="primary" size="sm" onClick={handleUpdatePassword} disabled={loading || !password || !confirmPassword}>
               {loading ? "Saving…" : "Set Password"}
             </Button>
           </div>
         }
       >
         <form onSubmit={handleUpdatePassword} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <p style={{ margin: 0, fontSize: 14, color: "var(--text-muted)", lineHeight: 1.5 }}>
+            Choose a strong password with at least 6 characters.
+          </p>
           <ErrorBanner message={error} />
           <Input
             label="New Password"
@@ -325,25 +347,31 @@ export function AuthModal({ open, onClose, onAuthSuccess, initialMode = "login" 
     return (
       <Dialog open={open} onClose={onClose} title="Check your email">
         <div style={{ textAlign: "center", padding: "20px 0" }}>
-          <div
-            style={{
-              width: 52, height: 52, borderRadius: "50%",
-              background: "var(--surface-lime)", color: "var(--oj-green-900)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              margin: "0 auto 16px",
-            }}
-          >
+          <div style={{
+            width: 52, height: 52, borderRadius: "50%",
+            background: "var(--surface-lime)", color: "var(--oj-green-900)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            margin: "0 auto 16px",
+          }}>
             <Icon name="mail" size={24} />
           </div>
           <h3 style={{ margin: "0 0 8px", color: "var(--text-heading)", fontFamily: "var(--font-display)" }}>
             Reset link sent
           </h3>
-          <p style={{ margin: "0 0 20px", color: "var(--text-muted)", fontSize: 14, lineHeight: 1.5 }}>
-            We sent a password reset link to <strong>{email}</strong>. Check your inbox and follow the link.
+          <p style={{ margin: "0 0 8px", color: "var(--text-muted)", fontSize: 14, lineHeight: 1.5 }}>
+            We sent a password reset link to <strong>{email}</strong>.
           </p>
-          <Button variant="ghost" size="sm" onClick={() => switchMode("login")}>
-            Back to Login
-          </Button>
+          <p style={{ margin: "0 0 20px", color: "var(--text-muted)", fontSize: 13, lineHeight: 1.5 }}>
+            Check your inbox (and spam folder) and click the link. It expires in 1 hour.
+          </p>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+            <Button variant="ghost" size="sm" onClick={() => switchMode("login")}>
+              Back to Login
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleForgotPassword} disabled={loading}>
+              {loading ? "Resending…" : "Resend link"}
+            </Button>
+          </div>
         </div>
       </Dialog>
     );
@@ -365,7 +393,7 @@ export function AuthModal({ open, onClose, onAuthSuccess, initialMode = "login" 
             >
               ← Back to Login
             </button>
-            <Button variant="primary" size="sm" onClick={handleForgotPassword} disabled={!email || loading}>
+            <Button variant="primary" size="sm" onClick={handleForgotPassword} disabled={!email.trim() || loading}>
               {loading ? "Sending…" : "Send Reset Link"}
             </Button>
           </div>
@@ -373,7 +401,7 @@ export function AuthModal({ open, onClose, onAuthSuccess, initialMode = "login" 
       >
         <form onSubmit={handleForgotPassword} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <p style={{ margin: 0, fontSize: 14, color: "var(--text-muted)", lineHeight: 1.5 }}>
-            Enter your email address and we'll send you a link to reset your password.
+            Enter the email address linked to your account and we'll send you a secure reset link.
           </p>
           <ErrorBanner message={error} />
           <Input
@@ -392,12 +420,14 @@ export function AuthModal({ open, onClose, onAuthSuccess, initialMode = "login" 
 
   // ── Login / Signup mode ──────────────────────────────────────────────────────
   const isLogin = mode === "login";
+  const canSubmit = (email.trim() || phone.trim()) && password &&
+    (isLogin || (confirmPassword && fullName.trim()));
 
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      title={titleMap[mode]}
+      title={isLogin ? "Log in to Ojawa" : "Join Ojawa Marketplace"}
       footer={
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", gap: 12 }}>
           <button
@@ -414,7 +444,7 @@ export function AuthModal({ open, onClose, onAuthSuccess, initialMode = "login" 
               size="sm"
               badgeIcon="user"
               onClick={handleSubmit}
-              disabled={!(email || phone) || !password || loading}
+              disabled={!canSubmit || loading}
             >
               {loading ? "Please wait…" : isLogin ? "Log In" : "Sign Up"}
             </Button>
@@ -444,7 +474,7 @@ export function AuthModal({ open, onClose, onAuthSuccess, initialMode = "login" 
           onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = "var(--border-default)"; }}
         >
           <GoogleLogo />
-          <span>{googleLoading ? "Redirecting…" : `Continue with Google`}</span>
+          <span>{googleLoading ? "Redirecting…" : "Continue with Google"}</span>
         </button>
 
         <Divider label="or continue with email" />
@@ -454,13 +484,11 @@ export function AuthModal({ open, onClose, onAuthSuccess, initialMode = "login" 
 
         {/* ─── Role Picker (sign-up only) ─── */}
         {!isLogin && (
-          <div
-            style={{
-              display: "grid", gridTemplateColumns: "repeat(3, 1fr)",
-              background: "var(--surface-sunken)", padding: 4,
-              borderRadius: "var(--radius-pill)", gap: 4,
-            }}
-          >
+          <div style={{
+            display: "grid", gridTemplateColumns: "repeat(3, 1fr)",
+            background: "var(--surface-sunken)", padding: 4,
+            borderRadius: "var(--radius-pill)", gap: 4,
+          }}>
             {[
               { id: "customer", label: "Customer", icon: "user" },
               { id: "vendor", label: "Vendor", icon: "store" },
@@ -506,6 +534,7 @@ export function AuthModal({ open, onClose, onAuthSuccess, initialMode = "login" 
             placeholder={role === "vendor" ? "Business / Store Name" : "Your Name"}
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
+            required
           />
         )}
 
@@ -545,6 +574,18 @@ export function AuthModal({ open, onClose, onAuthSuccess, initialMode = "login" 
             </button>
           )}
         </div>
+
+        {/* ─── Confirm Password (sign-up only) ─── */}
+        {!isLogin && (
+          <Input
+            label="Confirm Password"
+            type="password"
+            placeholder="••••••••"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+          />
+        )}
 
         {/* ─── Trust badge ─── */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text-faint)", marginTop: 4 }}>
