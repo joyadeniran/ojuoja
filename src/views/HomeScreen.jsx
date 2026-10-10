@@ -8,9 +8,11 @@ import { Accordion } from "../../components/navigation/Accordion.jsx";
 import { PatternPanel } from "../../components/brand/PatternPanel.jsx";
 import { DeliveryNote } from "../../components/commerce/DeliveryNote.jsx";
 import { Tag } from "../../components/core/Tag.jsx";
-import { CATEGORIES, PRODUCTS, VENDORS, FAQS, PHOTO_BASE } from "../data/marketData.js";
+import { CATEGORIES, FAQS, PHOTO_BASE } from "../data/marketData.js";
+import { useMarket } from "../lib/market.js";
 
 export function HomeScreen({ onNav, onAdd, onSelectProduct, onToggleFavourite, favourites = [] }) {
+  const { products: PRODUCTS, vendors: VENDORS } = useMarket();
   const [activeTab, setActiveTab] = useState("All");
 
   const filterMapping = {

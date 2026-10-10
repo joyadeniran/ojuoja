@@ -15,12 +15,14 @@ import {
   rejectVendorApplication,
   getAllVendors,
   toggleVendorVerification,
+  getAllWithdrawals,
+  processWithdrawal,
 } from "../../lib/supabase.js";
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 function DashShell({ title, subtitle, toast, onClearToast, children }) {
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 20px 64px" }}>
+    <div className="oj-dash-wrap" style={{ maxWidth: 1200 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
         <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--surface-brand)", color: "var(--text-on-brand)", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Icon name="shield-check" size={18} />
@@ -681,6 +683,60 @@ function ApplicationsSection({ applications, onApprove, onReject, loading, proce
   );
 }
 
+// ── Payouts Section (vendor withdrawal requests) ──────────────────────────────
+function PayoutsSection({ withdrawals, loading, onProcess, processingId }) {
+  const [filter, setFilter] = useState("pending");
+  const list = withdrawals.filter((w) => filter === "all" || w.status === filter);
+  const pendingTotal = withdrawals.filter((w) => w.status === "pending").reduce((s, w) => s + w.amount, 0);
+  return (
+    <SectionCard
+      title={`Vendor payouts — ₦${pendingTotal.toLocaleString("en-NG")} awaiting transfer`}
+      icon="wallet"
+      noPad
+      action={
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {["pending", "paid", "rejected", "all"].map((f) => (
+            <button key={f} type="button" onClick={() => setFilter(f)}
+              style={{ padding: "5px 12px", borderRadius: 99, border: filter === f ? "1px solid var(--surface-brand)" : "1px solid var(--border-subtle)", background: filter === f ? "var(--surface-brand)" : "#fff", color: filter === f ? "#fff" : "var(--text-muted)", fontSize: 12, fontWeight: 600, cursor: "pointer", textTransform: "capitalize" }}>
+              {f}
+            </button>
+          ))}
+        </div>
+      }
+    >
+      {loading ? (
+        <div style={{ padding: 40, textAlign: "center", color: "var(--text-faint)" }}>Loading payouts…</div>
+      ) : list.length === 0 ? (
+        <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>No {filter === "all" ? "" : filter} withdrawal requests.</div>
+      ) : (
+        list.map((w, i) => (
+          <div key={w.id} style={{ padding: "16px 20px", borderTop: i ? "1px solid var(--border-subtle)" : "none", display: "flex", gap: 16, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 16, color: "var(--text-heading)" }}>₦{w.amount.toLocaleString("en-NG")} <span style={{ fontWeight: 500, fontSize: 13, color: "var(--text-muted)" }}>· {w.vendors?.name || w.vendor_id}</span></div>
+              <div style={{ fontSize: 13, color: "var(--text-body)", marginTop: 4 }}>{w.account_name} — {w.bank_name} <strong style={{ fontFamily: "monospace" }}>{w.account_number}</strong></div>
+              <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 2 }}>Requested {new Date(w.created_at).toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" })}</div>
+            </div>
+            {w.status === "pending" ? (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <Button variant="primary" size="sm" disabled={processingId === w.id}
+                  onClick={() => window.confirm(`Confirm you have transferred ₦${w.amount.toLocaleString("en-NG")} to ${w.account_name} (${w.account_number})?`) && onProcess(w.id, "paid")}>
+                  Mark as paid
+                </Button>
+                <Button variant="ghost" size="sm" disabled={processingId === w.id}
+                  onClick={() => { const r = window.prompt("Reason for rejecting (shown to the vendor):", ""); if (r !== null) onProcess(w.id, "rejected", r); }}>
+                  Reject
+                </Button>
+              </div>
+            ) : (
+              <span style={{ fontSize: 12, fontWeight: 700, textTransform: "capitalize", padding: "3px 10px", borderRadius: 99, background: w.status === "paid" ? "#dcfce7" : "#fee2e2", color: w.status === "paid" ? "#166534" : "#991b1b" }}>{w.status}</span>
+            )}
+          </div>
+        ))
+      )}
+    </SectionCard>
+  );
+}
+
 // ── Nav Tabs ──────────────────────────────────────────────────────────────────
 const TABS = [
   { id: "overview", label: "Overview", icon: "layout-grid" },
@@ -688,6 +744,7 @@ const TABS = [
   { id: "vendors", label: "Active Vendors", icon: "store" },
   { id: "users", label: "Users", icon: "user" },
   { id: "orders", label: "Orders", icon: "package" },
+  { id: "payouts", label: "Payouts", icon: "wallet" },
 ];
 
 // ── Main Component ─────────────────────────────────────────────────────────────
@@ -699,6 +756,9 @@ export function AdminDashboard({ currentUser, onNav, onSignOut }) {
   const [vendors, setVendors] = useState([]);
   const [applications, setApplications] = useState([]);
   const [processingAppId, setProcessingAppId] = useState(null);
+  const [withdrawals, setWithdrawals] = useState([]);
+  const [withdrawalsLoading, setWithdrawalsLoading] = useState(true);
+  const [processingWdId, setProcessingWdId] = useState(null);
   const [toast, setToast] = useState(null);
   const [loading, setLoading] = useState({ stats: true, users: true, orders: true, apps: true, vendors: true });
 
@@ -718,6 +778,10 @@ export function AdminDashboard({ currentUser, onNav, onSignOut }) {
     getAllVendorApplications().then((data) => {
       setApplications(data);
       setLoading((l) => ({ ...l, apps: false }));
+    });
+    getAllWithdrawals().then((data) => {
+      setWithdrawals(data);
+      setWithdrawalsLoading(false);
     });
     getAllVendors().then((data) => {
       setVendors(data);
@@ -817,6 +881,18 @@ export function AdminDashboard({ currentUser, onNav, onSignOut }) {
     }
   }, []);
 
+  const handleProcessWithdrawal = useCallback(async (id, status, notes = "") => {
+    setProcessingWdId(id);
+    const result = await processWithdrawal(id, status, notes);
+    setProcessingWdId(null);
+    if (result.success) {
+      setWithdrawals((prev) => prev.map((w) => (w.id === id ? { ...w, ...result.data } : w)));
+      setToast({ tone: status === "paid" ? "success" : "danger", message: status === "paid" ? "Payout marked as paid." : "Withdrawal rejected." });
+    } else {
+      setToast({ tone: "danger", message: result.error });
+    }
+  }, []);
+
   const pendingApps = applications.filter((a) => a.status === "under_review").length;
 
   return (
@@ -848,6 +924,11 @@ export function AdminDashboard({ currentUser, onNav, onSignOut }) {
           >
             <Icon name={tab.icon} size={15} />
             {tab.label}
+            {tab.id === "payouts" && withdrawals.filter((w) => w.status === "pending").length > 0 && (
+              <span style={{ background: "var(--color-danger, #dc2626)", color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 99, padding: "1px 6px", marginLeft: 4 }}>
+                {withdrawals.filter((w) => w.status === "pending").length}
+              </span>
+            )}
             {tab.id === "applications" && pendingApps > 0 && (
               <span style={{ background: "var(--color-danger, #dc2626)", color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 99, padding: "1px 6px", marginLeft: 4 }}>
                 {pendingApps}
@@ -995,6 +1076,11 @@ export function AdminDashboard({ currentUser, onNav, onSignOut }) {
           onRestore={handleRestore}
           loading={loading.users}
         />
+      )}
+
+      {/* PAYOUTS TAB */}
+      {activeTab === "payouts" && (
+        <PayoutsSection withdrawals={withdrawals} loading={withdrawalsLoading} onProcess={handleProcessWithdrawal} processingId={processingWdId} />
       )}
 
       {/* ORDERS TAB */}

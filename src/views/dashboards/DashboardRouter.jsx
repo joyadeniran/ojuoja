@@ -14,7 +14,7 @@ import { DispatchDashboard } from "./DispatchDashboard.jsx";
  * Also shows a role-mismatch screen if somehow the wrong
  * `targetRole` is requested (edge-case safety).
  */
-export function DashboardRouter({ currentUser, onNav, onSignOut, onOpenAuth, favourites }) {
+export function DashboardRouter({ currentUser, onNav, onSignOut, onOpenAuth, favourites, onProfileUpdated }) {
   // ── Not logged in ──────────────────────────────────────────────────────────
   if (!currentUser) {
     return (
@@ -56,6 +56,7 @@ export function DashboardRouter({ currentUser, onNav, onSignOut, onOpenAuth, fav
       return (
         <VendorDashboard
           currentUser={currentUser}
+          onProfileUpdated={onProfileUpdated}
           onNav={onNav}
           onSignOut={onSignOut}
         />
@@ -95,6 +96,7 @@ export function DashboardRouter({ currentUser, onNav, onSignOut, onOpenAuth, fav
       return (
         <CustomerDashboard
           currentUser={currentUser}
+          onProfileUpdated={onProfileUpdated}
           onNav={onNav}
           onSignOut={onSignOut}
           favourites={favourites}

@@ -11,6 +11,7 @@ import { AboutModal } from "./components/Modals/AboutModal.jsx";
 import { AuthModal } from "./components/Modals/AuthModal.jsx";
 import { NotificationCenterModal } from "./components/Modals/NotificationCenterModal.jsx";
 import { OnboardingModal } from "./components/Modals/OnboardingModal.jsx";
+import { ProfileScreen } from "./views/ProfileScreen.jsx";
 import { DashboardRouter } from "./views/dashboards/DashboardRouter.jsx";
 import { Toast } from "../components/feedback/Toast.jsx";
 import { PRODUCTS, PHOTO_BASE } from "./data/marketData.js";
@@ -71,7 +72,14 @@ function formatNotifTime(isoString) {
 }
 
 export default function App() {
-  const [screen, setScreen] = useState("home");
+  const [screen, setScreen] = useState(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get("screen")) return p.get("screen");
+      if (window.location.hash === "#vendor-preview" || p.get("preview") === "vendor") return "dashboard";
+    }
+    return "home";
+  });
   const [screenParams, setScreenParams] = useState({});
   const [selectedProduct, setSelectedProduct] = useState(PRODUCTS[0]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -81,7 +89,24 @@ export default function App() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState("login");
   const [notificationsModalOpen, setNotificationsModalOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      if (window.location.hash === "#vendor-preview" || p.get("preview") === "vendor" || p.get("role") === "vendor") {
+        return {
+          id: "preview-vendor-id",
+          fullName: "Orange Stores",
+          email: "orange@ojawa.shop",
+          phone: "08012345678",
+          role: "vendor",
+          vendorStoreName: "Orange",
+          onboardingComplete: true,
+          provider: "email",
+        };
+      }
+    }
+    return null;
+  });
   // Onboarding modal: shown post-Google-OAuth when onboarding_complete = false
   const [onboardingUser, setOnboardingUser] = useState(null);
   const [notifications, setNotifications] = useState([]);
@@ -202,6 +227,9 @@ export default function App() {
     setUnreadCount(0);
     setToast({ tone: "info", icon: "user", title: "Signed out", message: "See you soon!" });
   };
+
+  // Merge profile edits (name, phone, avatar…) into the signed-in user
+  const handleProfileUpdated = (patch) => setCurrentUser((prev) => (prev ? { ...prev, ...patch } : prev));
 
   // Navigation function
   const nav = (newScreen, params = {}) => {
@@ -351,6 +379,7 @@ export default function App() {
         {screen === "basket" && (
           <BasketScreen
             items={basket}
+            customerEmail={currentUser?.email || ""}
             onNav={nav}
             onQty={(idx, newQty) =>
               setBasket((prev) => prev.map((item, j) => (j === idx ? { ...item, qty: newQty } : item)))
@@ -381,7 +410,7 @@ export default function App() {
               const newAdminNotif = {
                 recipient: "admin",
                 title: "Operations Order Logged",
-                message: `Order of ₦${order.total.toLocaleString("en-NG")} confirmed via ${order.paymentMethod === "transfer" ? "Bank Transfer" : "Cash"}. SLA 35–60m active.`,
+                message: `Order of ₦${order.total.toLocaleString("en-NG")} confirmed via ${order.paymentStatus === "paid" ? "online payment (paid)" : order.paymentMethod === "transfer" ? "Bank Transfer" : "Cash"}. SLA 35–60m active.`,
                 meta: `Ref: #OJ-${Math.floor(1000 + Math.random() * 9000)}`,
               };
 
@@ -444,6 +473,20 @@ export default function App() {
               setAuthModalOpen(true);
             }}
             favourites={favourites}
+            onProfileUpdated={handleProfileUpdated}
+          />
+        )}
+
+        {screen === "profile" && (
+          <ProfileScreen
+            currentUser={currentUser}
+            onNav={nav}
+            onSignOut={handleSignOut}
+            onOpenAuth={() => {
+              setAuthModalMode("login");
+              setAuthModalOpen(true);
+            }}
+            onProfileUpdated={handleProfileUpdated}
           />
         )}
       </div>

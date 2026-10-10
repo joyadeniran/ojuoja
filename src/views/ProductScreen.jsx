@@ -10,7 +10,7 @@ import { DeliveryNote } from "../../components/commerce/DeliveryNote.jsx";
 import { VendorCard } from "../../components/commerce/VendorCard.jsx";
 import { ProductCard } from "../../components/commerce/ProductCard.jsx";
 import { Icon } from "../../components/brand/Icon.jsx";
-import { PRODUCTS, VENDORS } from "../data/marketData.js";
+import { useMarket } from "../lib/market.js";
 
 const naira = (n) => "₦" + Number(n).toLocaleString("en-NG");
 
@@ -22,6 +22,7 @@ export function ProductScreen({
   onToggleFavourite,
   favourites = [],
 }) {
+  const { products: PRODUCTS, vendors: VENDORS } = useMarket();
   const p = product || PRODUCTS[0];
   const [activeImage, setActiveImage] = useState(p.image);
   const [qty, setQty] = useState(1);

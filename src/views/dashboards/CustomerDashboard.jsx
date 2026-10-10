@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { Icon } from "../../../components/brand/Icon.jsx";
 import { Button } from "../../../components/core/Button.jsx";
-import { Badge } from "../../../components/core/Badge.jsx";
-import { getMyOrders, updateMyProfile } from "../../lib/supabase.js";
+import { getMyOrders, getMyVendorApplications } from "../../lib/supabase.js";
+import { ProfileCard } from "../../components/ProfileCard.jsx";
 
 // ── Shared dashboard layout primitives ────────────────────────────────────────
 function DashShell({ title, subtitle, children }) {
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto", padding: "32px 20px 64px" }}>
+    <div className="oj-dash-wrap" style={{ maxWidth: 960 }}>
       <div style={{ marginBottom: 32 }}>
         <h1 style={{ fontFamily: "var(--font-display)", fontSize: 28, fontWeight: 700, color: "var(--text-heading)", margin: "0 0 6px" }}>
           {title}
@@ -73,106 +73,52 @@ function SectionCard({ title, icon, action, children }) {
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
-export function CustomerDashboard({ currentUser, onNav, favourites = [], onSignOut }) {
+export function CustomerDashboard({ currentUser, onNav, favourites = [], onSignOut, onProfileUpdated }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editMode, setEditMode] = useState(false);
-  const [editName, setEditName] = useState(currentUser?.fullName || "");
-  const [editPhone, setEditPhone] = useState(currentUser?.phone || "");
-  const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState("");
+  const [applications, setApplications] = useState([]);
 
   useEffect(() => {
     getMyOrders().then((data) => {
       setOrders(data);
       setLoading(false);
     });
+    getMyVendorApplications().then(setApplications);
   }, []);
 
-  const handleSaveProfile = async () => {
-    setSaving(true);
-    const result = await updateMyProfile({ full_name: editName, phone: editPhone });
-    setSaving(false);
-    if (result.success) {
-      setSaveMsg("Profile updated!");
-      setEditMode(false);
-      setTimeout(() => setSaveMsg(""), 3000);
-    }
-  };
-
   const totalSpend = orders.reduce((s, o) => s + (o.total || 0), 0);
-  const initials = (currentUser?.fullName || "?").split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
-
+  
   return (
     <DashShell title="My Account" subtitle="Manage your orders, favourites, and profile settings">
 
       {/* Stats Row */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16, marginBottom: 32 }}>
+      <div className="oj-stat-grid">
         <StatCard icon="shopping-bag" label="Total Orders" value={orders.length} tone="brand" />
         <StatCard icon="heart" label="Saved Items" value={favourites.length} tone="lime" />
         <StatCard icon="wallet" label="Total Spend" value={`₦${totalSpend.toLocaleString("en-NG")}`} tone="accent" />
         <StatCard icon="check-circle" label="Completed" value={orders.filter((o) => o.status === "completed").length} tone="neutral" />
       </div>
 
-      {/* Profile Card */}
-      <SectionCard
-        title="My Profile"
-        icon="user"
-        action={
-          !editMode ? (
-            <Button variant="ghost" size="sm" onClick={() => { setEditMode(true); setEditName(currentUser?.fullName || ""); setEditPhone(currentUser?.phone || ""); }}>
-              Edit
-            </Button>
-          ) : null
-        }
-      >
-        <div style={{ padding: 24 }}>
-          {saveMsg && (
-            <div style={{ background: "var(--surface-lime)", color: "var(--oj-green-900)", padding: "10px 16px", borderRadius: 8, marginBottom: 16, fontSize: 13, fontWeight: 600 }}>
-              ✓ {saveMsg}
-            </div>
-          )}
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 20, flexWrap: "wrap" }}>
-            {/* Avatar */}
-            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--surface-brand)", color: "var(--text-on-brand)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 700, flexShrink: 0 }}>
-              {currentUser?.avatarUrl ? (
-                <img src={currentUser.avatarUrl} alt="" style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover" }} />
-              ) : initials}
-            </div>
-
-            <div style={{ flex: 1 }}>
-              {editMode ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div>
-                    <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 4 }}>Full Name</label>
-                    <input value={editName} onChange={(e) => setEditName(e.target.value)}
-                      style={{ width: "100%", padding: "8px 12px", border: "1px solid var(--border-input)", borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-body)" }} />
-                  </div>
-                  <div>
-                    <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 4 }}>Phone Number</label>
-                    <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)}
-                      style={{ width: "100%", padding: "8px 12px", border: "1px solid var(--border-input)", borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-body)" }} />
-                  </div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <Button variant="primary" size="sm" onClick={handleSaveProfile} disabled={saving}>{saving ? "Saving…" : "Save Changes"}</Button>
-                    <Button variant="ghost" size="sm" onClick={() => setEditMode(false)}>Cancel</Button>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ fontWeight: 700, fontSize: 18, color: "var(--text-heading)" }}>{currentUser?.fullName}</div>
-                  <div style={{ fontSize: 14, color: "var(--text-muted)" }}>{currentUser?.email}</div>
-                  {currentUser?.phone && <div style={{ fontSize: 14, color: "var(--text-muted)" }}>{currentUser.phone}</div>}
-                  <div style={{ marginTop: 4 }}>
-                    <Badge tone="lime" icon="check-circle">
-                      {currentUser?.provider === "google" ? "Google Account" : "Email Account"}
-                    </Badge>
-                  </div>
-                </div>
-              )}
-            </div>
+      {/* Vendor application status */}
+      {applications.length > 0 && (() => {
+        const app = applications[0];
+        const tones = {
+          under_review: { bg: "#fffbeb", border: "#fde68a", color: "#92400e", title: "Your vendor application is under review", text: "We'll notify you as soon as it's approved. Your vendor dashboard (product uploads, sales, wallet) unlocks right after approval." },
+          approved: { bg: "#f0fdf4", border: "#86efac", color: "#166534", title: "Your vendor application was approved 🎉", text: "Sign out and back in to open your Vendor Dashboard." },
+          rejected: { bg: "#fef2f2", border: "#fecaca", color: "#991b1b", title: "Your vendor application was not approved", text: app.notes || "Contact Ojawa support for details or apply again." },
+        };
+        const t = tones[app.status] || tones.under_review;
+        return (
+          <div style={{ marginBottom: 24, padding: "16px 20px", borderRadius: 14, background: t.bg, border: `1px solid ${t.border}`, color: t.color }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>{t.title}</div>
+            <div style={{ fontSize: 13, lineHeight: 1.5 }}><strong>{app.shop_name}</strong> · {app.area} — {t.text}</div>
           </div>
-        </div>
+        );
+      })()}
+
+      {/* Profile Card */}
+      <SectionCard title="My Profile" icon="user">
+        <ProfileCard currentUser={currentUser} onUpdated={onProfileUpdated} />
       </SectionCard>
 
       {/* Order History */}

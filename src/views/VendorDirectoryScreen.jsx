@@ -5,9 +5,11 @@ import { VendorCard } from "../../components/commerce/VendorCard.jsx";
 import { Tag } from "../../components/core/Tag.jsx";
 import { Button } from "../../components/core/Button.jsx";
 import { Card } from "../../components/core/Card.jsx";
-import { VENDORS, AREAS } from "../data/marketData.js";
+import { AREAS } from "../data/marketData.js";
+import { useMarket } from "../lib/market.js";
 
 export function VendorDirectoryScreen({ onNav, onOpenVendorModal }) {
+  const { vendors: VENDORS } = useMarket();
   const [selectedArea, setSelectedArea] = useState("All");
 
   const filteredVendors = VENDORS.filter((v) => {

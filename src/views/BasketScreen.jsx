@@ -13,6 +13,7 @@ import { Dialog } from "../../components/feedback/Dialog.jsx";
 import { Badge } from "../../components/core/Badge.jsx";
 import { Icon } from "../../components/brand/Icon.jsx";
 import { AREAS } from "../data/marketData.js";
+import { payWithPaystack, paystackEnabled } from "../lib/paystack.js";
 
 const naira = (n) => "₦" + Number(n).toLocaleString("en-NG");
 
@@ -23,8 +24,12 @@ export function BasketScreen({
   onClearBasket,
   onNav,
   onCheckout,
+  customerEmail = "",
 }) {
-  const [payMethod, setPayMethod] = useState("transfer");
+  const [guestEmail, setGuestEmail] = useState("");
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState("");
+  const [payMethod, setPayMethod] = useState(paystackEnabled ? "paystack" : "transfer");
   const [confirmIdx, setConfirmIdx] = useState(null);
   const [selectedArea, setSelectedArea] = useState("Ita Elewa");
   const [streetAddress, setStreetAddress] = useState("12 Ita Elewa Road, near the roundabout");
@@ -38,7 +43,30 @@ export function BasketScreen({
 
   const vendorCount = new Set(items.map((i) => i.vendor)).size;
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
+    let paymentReference = null;
+    let paymentStatus = "unpaid";
+
+    if (payMethod === "paystack") {
+      setPayError("");
+      setPaying(true);
+      try {
+        const res = await payWithPaystack({
+          email: customerEmail || guestEmail.trim(),
+          amountNaira: total,
+          phone: phoneNumber,
+        });
+        paymentReference = res.reference;
+        paymentStatus = "paid";
+      } catch (err) {
+        setPaying(false);
+        if (err.message !== "cancelled") setPayError(err.message);
+        else setPayError("Payment was cancelled. Your basket is untouched.");
+        return;
+      }
+      setPaying(false);
+    }
+
     setOrderSuccess(true);
     if (onCheckout) {
       onCheckout({
@@ -49,6 +77,8 @@ export function BasketScreen({
         address: `${streetAddress}, ${selectedArea}, Ikorodu`,
         phone: phoneNumber,
         paymentMethod: payMethod,
+        paymentReference,
+        paymentStatus,
       });
     }
   };
@@ -224,6 +254,25 @@ export function BasketScreen({
                 >
                   <strong>Debit Card / POS</strong> on Rider Arrival
                 </Checkbox>
+                {paystackEnabled && (
+                  <Checkbox
+                    radio
+                    checked={payMethod === "paystack"}
+                    onChange={() => setPayMethod("paystack")}
+                  >
+                    <strong>Pay online now</strong> (Card, bank transfer or USSD via Paystack)
+                  </Checkbox>
+                )}
+                {payMethod === "paystack" && !customerEmail && (
+                  <div>
+                    <label htmlFor="guest-email" style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 6 }}>Email for your payment receipt</label>
+                    <input
+                      id="guest-email" type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--border-input)", borderRadius: 8, fontSize: 14, boxSizing: "border-box" }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -283,14 +332,19 @@ export function BasketScreen({
               </div>
 
               <div style={{ marginTop: 24 }}>
+                {payError && (
+                  <div role="alert" style={{ marginBottom: 12, padding: "10px 12px", borderRadius: 8, background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", fontSize: 13 }}>
+                    {payError}
+                  </div>
+                )}
                 <Button
                   block
                   size="lg"
                   badgeIcon="wallet"
                   onClick={handlePlaceOrder}
-                  disabled={!streetAddress || !phoneNumber}
+                  disabled={!streetAddress || !phoneNumber || paying || items.length === 0}
                 >
-                  Place Order
+                  {paying ? "Opening payment…" : payMethod === "paystack" ? `Pay ${naira(total)} now` : "Place Order"}
                 </Button>
               </div>
 
@@ -474,7 +528,7 @@ export function BasketScreen({
                   <Badge tone="neutral">Recorded</Badge>
                 </div>
                 <p style={{ margin: "3px 0 0", fontSize: 12, color: "var(--text-muted)", lineHeight: 1.4 }}>
-                  Ojawa operations logged payment ({payMethod === "transfer" ? "Bank Transfer" : payMethod === "cash" ? "Cash" : "Card"}) and delivery SLA (35–60 mins).
+                  Ojawa operations logged payment ({payMethod === "paystack" ? "Paid online" : payMethod === "transfer" ? "Bank Transfer" : payMethod === "cash" ? "Cash" : "Card"}) and delivery SLA (35–60 mins).
                 </p>
               </div>
             </div>

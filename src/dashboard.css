@@ -1,0 +1,30 @@
+/* Responsive layout helpers for dashboards & profile.
+   Dashboards used inline fixed grids (e.g. "1fr 340px"), which forced a
+   desktop-width layout on phones. These classes collapse them. */
+.oj-dash-wrap { max-width: 1080px; margin: 0 auto; padding: 32px 20px 64px; }
+.oj-dash-split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; }
+.oj-stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 16px; margin-bottom: 32px; }
+.oj-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.oj-form-grid .oj-span-2 { grid-column: 1 / -1; }
+.oj-profile-row { display: flex; gap: 28px; align-items: flex-start; }
+.oj-order-row { display: grid; grid-template-columns: 1fr 2fr auto auto; align-items: center; gap: 16px; padding: 14px 24px; }
+.oj-tabs { display: flex; gap: 4px; margin-bottom: 28px; border-bottom: 1px solid var(--border-subtle); overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.oj-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.oj-product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; padding: 20px; }
+.oj-modal-backdrop { position: fixed; inset: 0; background: rgba(8, 40, 22, 0.55); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.oj-modal { background: #fff; border-radius: 18px; width: 100%; max-width: 560px; max-height: calc(100vh - 32px); overflow-y: auto; box-shadow: 0 24px 60px rgba(0,0,0,.25); }
+
+@media (max-width: 900px) {
+  .oj-dash-split { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .oj-dash-wrap { padding: 20px 14px 48px; }
+  .oj-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .oj-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .oj-profile-row { flex-direction: column; align-items: stretch; gap: 18px; }
+  .oj-order-row { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; padding: 14px 16px; }
+  .oj-order-row > :nth-child(2) { grid-column: 1 / -1; order: 3; }
+  .oj-product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; gap: 12px; }
+  .oj-modal-backdrop { align-items: flex-end; padding: 0; }
+  .oj-modal { border-radius: 18px 18px 0 0; max-height: 92vh; }
+}

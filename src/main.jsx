@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import "../styles.css";
+import "./dashboard.css";
 
 // Configure design system asset and icon bases
 if (typeof window !== "undefined") {

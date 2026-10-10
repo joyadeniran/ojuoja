@@ -9,7 +9,8 @@ import { Pagination } from "../../components/navigation/Pagination.jsx";
 import { Button } from "../../components/core/Button.jsx";
 import { VendorCard } from "../../components/commerce/VendorCard.jsx";
 import { EmptyState } from "../../components/feedback/EmptyState.jsx";
-import { PRODUCTS, VENDORS, AREAS, CATEGORIES } from "../data/marketData.js";
+import { AREAS, CATEGORIES } from "../data/marketData.js";
+import { useMarket } from "../lib/market.js";
 
 export function CategoryScreen({
   onNav,
@@ -21,6 +22,7 @@ export function CategoryScreen({
   onToggleFavourite,
   favourites = [],
 }) {
+  const { products: PRODUCTS } = useMarket();
   const [page, setPage] = useState(1);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [freeDeliveryOnly, setFreeDeliveryOnly] = useState(false);
@@ -49,7 +51,7 @@ export function CategoryScreen({
       if (sortBy === "Top rated") return b.rating - a.rating;
       return (b.reviewsCount || 0) - (a.reviewsCount || 0); // Most popular
     });
-  }, [verifiedOnly, freeDeliveryOnly, selectedArea, selectedCategory, searchQuery, sortBy]);
+  }, [PRODUCTS, verifiedOnly, freeDeliveryOnly, selectedArea, selectedCategory, searchQuery, sortBy]);
 
   const itemsPerPage = 6;
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / itemsPerPage));

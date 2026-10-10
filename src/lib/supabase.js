@@ -110,6 +110,7 @@ export function buildUserObject(session, profile) {
     onboardingComplete: profile?.onboarding_complete ?? true,
     // Vendor-specific: the exact store name used to match against order items
     vendorStoreName: profile?.vendor_store_name || null,
+    preferredArea: profile?.preferred_area || "",
   };
 }
 
@@ -243,22 +244,66 @@ export async function checkSupabaseConnection() {
 // DATA: PRODUCTS
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Map a DB product row (snake_case) to the shape the UI components expect. */
+export function normalizeProduct(p) {
+  if (!p) return p;
+  const image = p.image || "";
+  return {
+    ...p,
+    was: p.was ?? p.was_price ?? null,
+    vendorId: p.vendorId ?? p.vendor_id ?? null,
+    reviewsCount: p.reviewsCount ?? p.reviews_count ?? 0,
+    rating: Number(p.rating) || 4.8,
+    image,
+    thumbnails: p.thumbnails && p.thumbnails.length ? p.thumbnails : image ? [image] : [],
+    details: Array.isArray(p.details) ? p.details : [],
+    reviews: Array.isArray(p.reviews) ? p.reviews : [],
+    flag: p.flag || null,
+    verified: p.verified ?? true,
+  };
+}
+
+/** Map a DB vendor row (snake_case) to the shape the UI components expect. */
+export function normalizeVendor(v) {
+  if (!v) return v;
+  return {
+    ...v,
+    deliveryMins: v.deliveryMins ?? v.delivery_mins ?? 35,
+    rating: Number(v.rating) || 4.8,
+    imageUrl: v.imageUrl ?? v.image_url ?? null,
+  };
+}
+
+/** Combine local seed data with live DB rows; DB rows win on matching id. */
+function mergeById(local, remote) {
+  const map = new Map(local.map((x) => [x.id, x]));
+  remote.forEach((x) => map.set(x.id, { ...(map.get(x.id) || {}), ...x }));
+  return Array.from(map.values());
+}
+
+/**
+ * Marketplace products = local seed catalogue + every available product that
+ * vendors have uploaded. Never returns *only* the seed once DB rows exist, and
+ * never drops DB rows when a request fails (callers keep the previous list).
+ * Returns null on a failed request so the caller can keep what it already has.
+ */
 export async function getProducts() {
   try {
     const { data, error } = await supabase
       .from("products")
       .select("*")
       .order("created_at", { ascending: false });
-
     if (error) {
-      console.info("Using local products catalogue:", error.message);
-      return PRODUCTS;
+      console.info("Could not load products from Supabase:", error.message);
+      return null;
     }
-    if (!data || data.length === 0) return PRODUCTS;
-    return data;
+    const live = (data || []).filter((p) => p.is_available !== false).map(normalizeProduct);
+    // Hidden/unavailable DB products must also hide the seed copy with that id.
+    const hidden = new Set((data || []).filter((p) => p.is_available === false).map((p) => p.id));
+    return mergeById(PRODUCTS.filter((p) => !hidden.has(p.id)), live);
   } catch (err) {
-    console.warn("Error fetching products, using local fallback:", err);
-    return PRODUCTS;
+    console.warn("Error fetching products:", err);
+    return null;
   }
 }
 
@@ -266,17 +311,20 @@ export async function getProducts() {
 // DATA: VENDORS
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Marketplace vendors = local seed + every vendor row in the DB (null on failure). */
 export async function getVendors() {
   try {
     const { data, error } = await supabase
       .from("vendors")
       .select("*")
-      .order("rating", { ascending: false });
-
-    if (error || !data || data.length === 0) return VENDORS;
-    return data;
+      .order("created_at", { ascending: false });
+    if (error) {
+      console.info("Could not load vendors from Supabase:", error.message);
+      return null;
+    }
+    return mergeById(VENDORS, (data || []).map(normalizeVendor));
   } catch {
-    return VENDORS;
+    return null;
   }
 }
 
@@ -286,23 +334,29 @@ export async function getVendors() {
 
 export async function createOrder(orderPayload, userId = null) {
   try {
-    const { data, error } = await supabase
-      .from("orders")
-      .insert([
-        {
-          customer_id: userId || null,
-          items: orderPayload.items,
-          subtotal: orderPayload.subtotal,
-          delivery_fee: orderPayload.delivery,
-          total: orderPayload.total,
-          delivery_address: orderPayload.address,
-          phone: orderPayload.phone,
-          payment_method: orderPayload.paymentMethod,
-          status: "pending",
-          created_at: new Date().toISOString(),
-        },
-      ])
-      .select();
+    const base = {
+      customer_id: userId || null,
+      items: orderPayload.items,
+      subtotal: orderPayload.subtotal,
+      delivery_fee: orderPayload.delivery,
+      total: orderPayload.total,
+      delivery_address: orderPayload.address,
+      phone: orderPayload.phone,
+      payment_method: orderPayload.paymentMethod,
+      status: "pending",
+      created_at: new Date().toISOString(),
+    };
+    const withPayment = {
+      ...base,
+      payment_reference: orderPayload.paymentReference || null,
+      payment_status: orderPayload.paymentStatus || "unpaid",
+    };
+
+    let { data, error } = await supabase.from("orders").insert([withPayment]).select();
+    // Payment columns missing (migration not applied yet) → retry without them
+    if (error && /payment_(reference|status)/.test(error.message || "")) {
+      ({ data, error } = await supabase.from("orders").insert([base]).select());
+    }
 
     if (error) {
       console.warn("Could not insert order into Supabase, recorded locally:", error.message);
@@ -628,13 +682,34 @@ export async function toggleVendorVerification(vendorId, currentVerified) {
 
 /**
  * Admin: comprehensive approval of a vendor application.
- * 1. Sets vendor_applications status to 'approved'.
- * 2. Generates vendor slug & inserts into public.vendors.
- * 3. Initializes vendor_store_settings.
- * 4. Upgrades applicant profile to role='vendor', vendor_store_name, vendor_id, onboarding_complete=true.
- * 5. Sends celebratory notification to applicant & audit log to admin.
+ *
+ * Preferred path: the `approve_vendor_application` Postgres function (see
+ * supabase/migration_v3_vendor_payments.sql) which performs every write in ONE
+ * transaction — vendor row, profile upgrade, store settings, notification and
+ * the status flip to 'approved'.
+ *
+ * Fallback (migration not applied yet): the same steps from the client, but the
+ * status update is now verified. Previously a blocked/0-row UPDATE was ignored,
+ * so the application stayed 'under_review' and re-appeared on every admin login.
  */
 export async function approveVendorApplication(app) {
+  try {
+    const rpc = await supabase.rpc("approve_vendor_application", { p_app_id: app.id });
+    if (!rpc.error) {
+      const vendor = rpc.data || null;
+      return { success: true, vendorId: vendor?.id, vendor };
+    }
+    // 42883 / PGRST202 = function does not exist → use the client fallback
+    const missingFn = rpc.error.code === "42883" || rpc.error.code === "PGRST202";
+    if (!missingFn) return { success: false, error: rpc.error.message };
+
+    return await approveVendorApplicationClientSide(app);
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+async function approveVendorApplicationClientSide(app) {
   try {
     const slugBase = (app.shop_name || "vendor")
       .toLowerCase()
@@ -643,12 +718,21 @@ export async function approveVendorApplication(app) {
       .replace(/^-+|-+$/g, "");
     const vendorId = slugBase || `vendor-${Date.now()}`;
 
-    // 1. Update application status
-    const { error: appError } = await supabase
+    // 1. Update application status FIRST and verify a row was really changed.
+    //    (RLS silently filters rows: no error, but also no update.)
+    const { data: updatedRows, error: appError } = await supabase
       .from("vendor_applications")
       .update({ status: "approved" })
-      .eq("id", app.id);
-    if (appError) console.warn("Application status update note:", appError.message);
+      .eq("id", app.id)
+      .select("id");
+    if (appError) return { success: false, error: appError.message };
+    if (!updatedRows || updatedRows.length === 0) {
+      return {
+        success: false,
+        error:
+          "The database refused to update this application (check that your account has role 'admin' and run migration_v3_vendor_payments.sql).",
+      };
+    }
 
     // 2. Insert or upsert vendor record
     const vendorPayload = {
@@ -669,7 +753,9 @@ export async function approveVendorApplication(app) {
       .select()
       .single();
     if (vendorError) {
-      console.warn("Vendors table upsert warning:", vendorError.message);
+      // Roll the status back so the request is not lost.
+      await supabase.from("vendor_applications").update({ status: "under_review" }).eq("id", app.id);
+      return { success: false, error: `Could not create vendor: ${vendorError.message}` };
     }
 
     // 3. If there is an applicant user, upgrade their profile & store settings
@@ -702,10 +788,11 @@ export async function approveVendorApplication(app) {
       if (settingsError) console.warn("Store settings init note:", settingsError.message);
 
       // Send congratulations notification to vendor
+      // (was calling an undefined `recordSupabaseNotification`, so it always threw)
       try {
-        await recordSupabaseNotification({
+        await recordNotification({
           recipient: "vendor",
-          user_id: app.applicant_id,
+          userId: app.applicant_id,
           title: "Vendor Application Approved! 🎉",
           message: `Congratulations! Your shop "${app.shop_name}" has been approved and verified. You now have full access to your Vendor Dashboard.`,
           meta: `Zone: ${app.area || "Ikorodu"}`,
@@ -717,7 +804,7 @@ export async function approveVendorApplication(app) {
 
     // Admin audit notification
     try {
-      await recordSupabaseNotification({
+      await recordNotification({
         recipient: "admin",
         title: "Vendor Store Activated",
         message: `${app.shop_name} (${app.owner_name}) has been approved and activated in ${app.area}.`,
@@ -872,3 +959,269 @@ export async function updateMyProfile(updates) {
   return { success: true, data };
 }
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VENDOR TOOLS: own vendor record, products, media, sales analytics
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The logged-in vendor's `vendors` row (resolved by profile.vendor_id, then owner_id). */
+export async function getMyVendor() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data: profile } = await supabase
+    .from("profiles").select("vendor_id, vendor_store_name, full_name, preferred_area, role").eq("id", user.id).single();
+
+  let vendorRow = null;
+
+  if (profile?.vendor_id) {
+    const { data } = await supabase.from("vendors").select("*").eq("id", profile.vendor_id).maybeSingle();
+    if (data) vendorRow = data;
+  }
+  if (!vendorRow) {
+    const { data: owned } = await supabase
+      .from("vendors").select("*").eq("owner_id", user.id).order("created_at").limit(1);
+    if (owned && owned[0]) vendorRow = owned[0];
+  }
+  if (!vendorRow && profile?.vendor_store_name) {
+    const { data: byName } = await supabase
+      .from("vendors").select("*").ilike("name", profile.vendor_store_name).limit(1);
+    if (byName && byName[0]) vendorRow = byName[0];
+  }
+
+  // If vendor row exists, ensure owner_id and profile.vendor_id are linked
+  if (vendorRow) {
+    if (!vendorRow.owner_id) {
+      await supabase.from("vendors").update({ owner_id: user.id }).eq("id", vendorRow.id);
+      vendorRow.owner_id = user.id;
+    }
+    if (!profile.vendor_id) {
+      await supabase.from("profiles").update({ vendor_id: vendorRow.id, vendor_store_name: vendorRow.name }).eq("id", user.id);
+    }
+    return normalizeVendor(vendorRow);
+  }
+
+  // If user has role 'vendor' but no vendors table row exists yet, auto-provision it
+  if (profile?.role === "vendor") {
+    const storeName = profile.vendor_store_name || profile.full_name || "My Store";
+    const slug = storeName.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || `vendor-${Date.now()}`;
+    const newVendor = {
+      id: slug,
+      name: storeName,
+      area: profile.preferred_area || "Ita Elewa",
+      verified: true,
+      rating: 4.8,
+      delivery_mins: 35,
+      tagline: `${storeName} • Verified Merchant`,
+      description: `Verified merchant in ${profile.preferred_area || "Ikorodu"}.`,
+      owner_id: user.id,
+    };
+    const { data: created } = await supabase.from("vendors").upsert([newVendor]).select().single();
+    if (created) {
+      await supabase.from("profiles").update({ vendor_id: created.id, vendor_store_name: storeName }).eq("id", user.id);
+      return normalizeVendor(created);
+    }
+  }
+
+  return null;
+}
+
+/** Vendor: update public store profile (name/tagline/description/banner image…). */
+export async function updateVendorProfile(vendorId, updates) {
+  const { data, error } = await supabase
+    .from("vendors").update(updates).eq("id", vendorId).select().single();
+  if (error) return { success: false, error: error.message };
+  return { success: true, data: normalizeVendor(data) };
+}
+
+/** Upload an image to the public `ojawa-media` bucket under the user's own folder. */
+export async function uploadMedia(file, folder = "products") {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Not authenticated" };
+  if (!file) return { success: false, error: "No file selected" };
+  if (!file.type?.startsWith("image/")) return { success: false, error: "Please choose an image file" };
+  if (file.size > 5 * 1024 * 1024) return { success: false, error: "Image must be smaller than 5MB" };
+
+  const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `${user.id}/${folder}/${Date.now()}-${safe}`;
+  const { error } = await supabase.storage.from("ojawa-media").upload(path, file, {
+    cacheControl: "31536000", upsert: false, contentType: file.type,
+  });
+  if (error) return { success: false, error: error.message };
+  const { data } = supabase.storage.from("ojawa-media").getPublicUrl(path);
+  return { success: true, url: data.publicUrl };
+}
+
+/** Vendor: all products (including hidden ones) belonging to this vendor. */
+export async function getVendorProducts(vendorId) {
+  if (!vendorId) return [];
+  const { data, error } = await supabase
+    .from("products").select("*").eq("vendor_id", vendorId).order("created_at", { ascending: false });
+  if (error) return [];
+  return (data || []).map(normalizeProduct);
+}
+
+/** Vendor: create or update a product. `vendor` is the vendors row. */
+export async function saveVendorProduct(form, vendor) {
+  const isNew = !form.id;
+  const price = Math.round(Number(form.price));
+  if (!form.name?.trim()) return { success: false, error: "Product name is required" };
+  if (!price || price < 1) return { success: false, error: "Enter a valid price" };
+
+  const row = {
+    id: form.id || `p-${vendor.id}-${Date.now().toString(36)}`,
+    name: form.name.trim(),
+    category: form.category || "groceries",
+    price,
+    was_price: form.was_price ? Math.round(Number(form.was_price)) : null,
+    vendor: vendor.name,
+    vendor_id: vendor.id,
+    area: vendor.area,
+    verified: vendor.verified ?? true,
+    image: form.image || null,
+    thumbnails: form.image ? [form.image] : null,
+    unit: form.unit?.trim() || null,
+    description: form.description?.trim() || null,
+    stock: form.stock === "" || form.stock == null ? null : Math.max(0, Math.round(Number(form.stock))),
+    is_available: form.is_available !== false,
+  };
+  if (row.was_price && row.was_price > price) {
+    row.flag = { label: `-${Math.round(((row.was_price - price) / row.was_price) * 100)}%`, tone: "danger" };
+  } else {
+    row.was_price = null;
+    row.flag = null;
+  }
+
+  let query = isNew
+    ? supabase.from("products").insert([row])
+    : supabase.from("products").update(row).eq("id", row.id);
+  let { data, error } = await query.select();
+  // Older DBs without stock/is_available columns → retry without them
+  if (error && /(stock|is_available)/.test(error.message || "")) {
+    const { stock, is_available, ...legacy } = row;
+    query = isNew ? supabase.from("products").insert([legacy]) : supabase.from("products").update(legacy).eq("id", row.id);
+    ({ data, error } = await query.select());
+  }
+  if (error) return { success: false, error: error.message };
+  if (!data || data.length === 0) return { success: false, error: "Not allowed to save this product" };
+  return { success: true, data: normalizeProduct(data[0]) };
+}
+
+export async function deleteVendorProduct(productId) {
+  const { data, error } = await supabase.from("products").delete().eq("id", productId).select("id");
+  if (error) return { success: false, error: error.message };
+  if (!data || data.length === 0) return { success: false, error: "Product not found or not yours" };
+  return { success: true };
+}
+
+/** Vendor: revenue per day for the last `days` days + best-selling products (from orders). */
+export function computeSalesSeries(orders, vendorName, days = 7) {
+  const name = (vendorName || "").toLowerCase();
+  const series = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - i);
+    series.push({ key: d.toDateString(), label: d.toLocaleDateString("en-NG", { weekday: "short" }), revenue: 0, orders: 0 });
+  }
+  orders.forEach((o) => {
+    if (o.status === "cancelled") return;
+    const key = new Date(o.created_at).toDateString();
+    const bucket = series.find((s) => s.key === key);
+    if (!bucket) return;
+    const mine = (o.items || []).filter((i) => (i.vendor || "").toLowerCase() === name);
+    if (!mine.length) return;
+    bucket.orders += 1;
+    bucket.revenue += mine.reduce((s, i) => s + (i.price || 0) * (i.qty || 1), 0);
+  });
+  return series;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WALLET & WITHDRAWALS (server-enforced via RPC — see migration_v3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function getVendorWallet() {
+  const { data, error } = await supabase.rpc("vendor_wallet");
+  if (error) return { error: error.message, available: 0, earned: 0, withdrawn: 0, pending_withdrawals: 0, gross: 0, commission_pct: 10 };
+  return data;
+}
+
+export async function getPayoutAccount(vendorId) {
+  if (!vendorId) return null;
+  const { data } = await supabase.from("vendor_payout_accounts").select("*").eq("vendor_id", vendorId).maybeSingle();
+  return data || null;
+}
+
+export async function savePayoutAccount(vendorId, account) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Not authenticated" };
+  if (!/^\d{10}$/.test((account.account_number || "").trim())) {
+    return { success: false, error: "Account number must be 10 digits (NUBAN)" };
+  }
+  if (!account.bank_name?.trim() || !account.account_name?.trim()) {
+    return { success: false, error: "Bank name and account name are required" };
+  }
+  const { data, error } = await supabase.from("vendor_payout_accounts").upsert({
+    vendor_id: vendorId, owner_id: user.id,
+    bank_name: account.bank_name.trim(), account_number: account.account_number.trim(),
+    account_name: account.account_name.trim(), updated_at: new Date().toISOString(),
+  }).select().single();
+  if (error) return { success: false, error: error.message };
+  return { success: true, data };
+}
+
+export async function requestWithdrawal(amount) {
+  const { data, error } = await supabase.rpc("request_withdrawal", { p_amount: Math.round(Number(amount)) });
+  if (error) return { success: false, error: error.message };
+  return { success: true, data };
+}
+
+export async function getMyWithdrawals() {
+  const { data, error } = await supabase
+    .from("withdrawal_requests").select("*").order("created_at", { ascending: false }).limit(50);
+  if (error) return [];
+  return data || [];
+}
+
+/** Admin: every withdrawal request. */
+export async function getAllWithdrawals() {
+  const { data, error } = await supabase
+    .from("withdrawal_requests").select("*, vendors(name)").order("created_at", { ascending: false }).limit(200);
+  if (error) {
+    const plain = await supabase.from("withdrawal_requests").select("*").order("created_at", { ascending: false }).limit(200);
+    return plain.data || [];
+  }
+  return data || [];
+}
+
+/** Admin: mark a withdrawal as paid (after sending the transfer) or rejected. */
+export async function processWithdrawal(id, status, notes = "") {
+  const { data, error } = await supabase
+    .from("withdrawal_requests")
+    .update({ status, notes, processed_at: new Date().toISOString() })
+    .eq("id", id).eq("status", "pending").select();
+  if (error) return { success: false, error: error.message };
+  if (!data || data.length === 0) return { success: false, error: "Request already processed or not permitted" };
+  return { success: true, data: data[0] };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// APPLICANT VIEW: status of my own vendor applications
+// ─────────────────────────────────────────────────────────────────────────────
+export async function getMyVendorApplications() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data, error } = await supabase
+    .from("vendor_applications").select("*").eq("applicant_id", user.id).order("created_at", { ascending: false });
+  if (error) return [];
+  return data || [];
+}
+
+/** Upload an avatar and save it on the profile. */
+export async function uploadAvatar(file) {
+  const up = await uploadMedia(file, "avatars");
+  if (!up.success) return up;
+  const res = await updateMyProfile({ avatar_url: up.url });
+  if (!res.success) return res;
+  return { success: true, url: up.url };
+}
