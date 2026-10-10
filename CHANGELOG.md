@@ -7,33 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.3.0] - 2026-10-10
 
-- **Admin Vendor Approvals & Platform Vendor Management (`AdminDashboard.jsx`)**:
-  - Dedicated **Vendor Approvals** queue tab with category, zone, application date, and applicant phone dial links.
-  - End-to-end `approveVendorApplication` flow: updates application status to `approved`, creates merchant record in `public.vendors`, initializes `public.vendor_store_settings`, upgrades applicant's profile to `role = 'vendor'`, assigns `vendor_store_name`, and sends in-app notifications.
-  - Dedicated **Active Vendors** management tab: view all marketplace stores, search by name/zone, and 1-click toggle for verified merchant badges (`toggleVendorVerification`).
-  - Action feedback toast alerts in Admin Console for all operations.
-- **Post-Google-OAuth Onboarding Wizard (`OnboardingModal.jsx`)**: 3-step mandatory onboarding modal for users signing up via Google OAuth to select role (Customer, Vendor, Dispatch Rider) and submit required profile metadata.
-- **Profile Schema Expansion**:
-  - `onboarding_complete` (boolean): Flags whether a user has finished initial onboarding.
-  - `vendor_store_name` (text): Explicit vendor store name used for resilient order matching and attribution.
-  - `vendor_id` (text): Relational link to `public.vendors`.
-  - `preferred_area` (text): Preferred delivery zone for customer accounts.
-- **Admin User Management Controls**:
-  - Account suspension (`suspendProfile`) and restoration (`restoreProfile`) capabilities directly in `AdminDashboard.jsx`.
-  - Suspended accounts visual badge, styling, and filter option in Admin Users table.
-- **Admin Promotion Helper Script (`supabase/promote_admin.sql`)**: Safe SQL script for elevating administrative users in Supabase.
-- **Role-Scoped Notification Security**:
-  - Enhanced RLS policies in `supabase/schema.sql` restricting notification reads to role matches (`admin`, `vendor`, `dispatch`, `customer`), user-specific notifications, or platform broadcasts.
-  - Notification mark-as-read DB sync on notification center open.
+### Added
+- **Full Vendor Dashboard & Merchant Management (`VendorDashboard.jsx`)**:
+  - **Overview Tab**: Live real-time metric cards (total revenue in NGN, active products count, pending orders queue, completed order totals), 7-day sales breakdown chart, and fast-action buttons.
+  - **Product Catalog Management (`ProductModal`)**:
+    - Product creation and editing interface supporting title, category, price, discount price, unit (kg, bag, pack), stock count, and description.
+    - Product image upload directly to Supabase Storage with local URL fallback.
+    - Product visibility toggle (`is_active` / in-stock) and deletion flow with confirmation dialog.
+  - **Orders Tab**: Real-time order list with customer name, phone dial link, delivery address, item breakdown, and status updater (`pending` &rarr; `in_progress` &rarr; `completed` &rarr; `cancelled`).
+  - **Wallet & Payouts Tab**:
+    - Available balance, pending payout, and lifetime earnings display.
+    - Bank account configuration (Bank Name, Account Number, Account Name) saved to `vendor_payout_accounts`.
+    - Withdrawal request modal with balance validation and payout status history table (`pending`, `processed`, `rejected`).
+  - **Store Profile Tab**: In-app management of merchant store name, description, phone number, delivery zone, opening hours, and open/closed status toggle.
+- **HTML5 History Path Routing & Persistent Reloads**:
+  - Replaced hash anchors with standard clean browser paths: `/` (Home), `/dashboard` (Dashboard), `/vendors` (Vendors), `/basket` (Cart), `/profile` (Profile), `/category` (Categories), and `/product?id=...` (Product Details).
+  - Synchronized browser URL bar with `window.history.pushState` / `replaceState` and added `popstate` event listeners for native Back / Forward browser navigation.
+  - Added `parseLocation()` URL initializer so reloading a page preserves the current view without resetting to homepage.
+  - Added [vercel.json](file:///Users/joyadeniran/Documents/ojuoja/vercel.json) SPA rewrite rule (`/(.*)` &rarr; `/index.html`) ensuring clean paths and page reloads never 404 on Vercel.
+- **Paystack Payment & Edge Function Integration**:
+  - Customer checkout via Paystack popup in `BasketScreen.jsx` with email capture and transaction references.
+  - Supabase Edge Function (`supabase/functions/paystack-webhook/index.ts`) validating Paystack HMAC-SHA512 webhook signatures, updating order status to `paid`, advancing to `in_progress`, and generating automated vendor/admin notifications.
+- **Super-Admin Payout Approval Flow (`AdminDashboard.jsx`)**:
+  - Dedicated **Payouts** tab in the Super-Admin console.
+  - Full withdrawal review queue displaying vendor identity, requested amount, bank details, and timestamps with 1-click Approve (with payment reference) or Reject (with note).
+- **Vendor Migration v3 (`supabase/migration_v3_vendor_payments.sql`)**:
+  - New schema tables: `vendor_payout_accounts`, `vendor_withdrawals`, and `vendor_wallets` view.
+  - Robust JSON item validation (`jsonb_typeof(items) = 'array'`) protecting against malformed order rows.
+  - RLS policies allowing authenticated vendors to insert, update, and manage their own products.
+  - Exception-guarded storage bucket initialization preventing permission aborts during migrations.
+- **User Profile Management (`ProfileScreen.jsx` & `ProfileCard.jsx`)**:
+  - Dedicated user profile screen at `/profile` for all roles to update name, phone number, preferred area, and avatar photo.
+  - Application review status banner on customer dashboard for pending vendor applicants.
+- **Vendored Lucide Icons & Responsive Design**:
+  - Vendored missing Lucide SVG icons (`activity`, `alert-circle`, `arrow-down-circle`, `bar-chart-2`, `check-circle`, `image`, `inbox`, `landmark`, `layout-dashboard`, `list`, `lock`, `log-out`, `settings`, `shopping-bag`, `slash`, `trending-up`, `zap`) into `assets/icons/`.
+  - Added responsive dashboard rules in `src/dashboard.css` replacing fixed 2-column desktop layouts with mobile-friendly stacks.
 
 ### Changed
-- **Vendor Order Attribution**: `VendorDashboard.jsx` now filters pending and recent orders by `vendorStoreName` from profile (with fallback to `fullName` for backwards compatibility).
-- **Trigger `handle_new_user()`**: Sets `onboarding_complete = false` and default `customer` role for OAuth providers, and inherits role metadata with `onboarding_complete = true` for email/password signups.
-- **Database Policies**: Hardened RLS policies across `products`, `vendor_applications`, and `notifications`.
+- **Vendor Resilience (`src/lib/supabase.js`)**:
+  - Implemented `getMyVendor()` auto-linking to prevent merchant stores from disappearing when vendor accounts log in.
+  - Hybrid data merging for products and vendors between live Supabase DB records and static market fallback data.
+- **Breadcrumbs & Navigation Links**: Replaced `#home`, `#category`, `#vendors` in `Header.jsx`, `Footer.jsx`, `BasketScreen.jsx`, `ProductScreen.jsx`, `CategoryScreen.jsx`, and `VendorDirectoryScreen.jsx` with clean paths.
 
 ---
+
+
 
 ## [1.2.0] - 2026-09-13
 
