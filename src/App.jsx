@@ -71,17 +71,83 @@ function formatNotifTime(isoString) {
   }
 }
 
-export default function App() {
-  const [screen, setScreen] = useState(() => {
-    if (typeof window !== "undefined") {
-      const p = new URLSearchParams(window.location.search);
-      if (p.get("screen")) return p.get("screen");
-      if (window.location.hash === "#vendor-preview" || p.get("preview") === "vendor") return "dashboard";
+/**
+ * Parse current URL (pathname, search query, or hash) into screen and params.
+ * Enables direct URL visits, browser reloads, and back/forward navigation.
+ */
+function parseLocation() {
+  if (typeof window === "undefined") {
+    return { screen: "home", params: {} };
+  }
+
+  const pathname = window.location.pathname.replace(/^\/+|\/+$/g, "");
+  const search = new URLSearchParams(window.location.search);
+  const hash = window.location.hash;
+
+  // Query parameter fallback (?screen=dashboard)
+  if (search.get("screen")) {
+    return { screen: search.get("screen"), params: Object.fromEntries(search.entries()) };
+  }
+
+  // Developer / Preview shortcut (?preview=vendor or #vendor-preview)
+  if (hash === "#vendor-preview" || search.get("preview") === "vendor") {
+    return { screen: "dashboard", params: { preview: "vendor" } };
+  }
+
+  const validScreens = ["home", "category", "product", "basket", "vendors", "dashboard", "profile"];
+  const screenFromPath = pathname.split("/")[0];
+
+  if (validScreens.includes(screenFromPath)) {
+    const params = Object.fromEntries(search.entries());
+    if (screenFromPath === "category") {
+      if (search.get("cat")) params.categoryId = search.get("cat");
+      if (search.get("area")) params.area = search.get("area");
     }
-    return "home";
+    if (screenFromPath === "product") {
+      if (search.get("id")) params.productId = search.get("id");
+    }
+    return { screen: screenFromPath, params };
+  }
+
+  // Fallback for clean hash (e.g. #vendors, #dashboard)
+  const cleanHash = hash.replace(/^#/, "");
+  if (validScreens.includes(cleanHash)) {
+    return { screen: cleanHash, params: {} };
+  }
+
+  return { screen: "home", params: {} };
+}
+
+/**
+ * Format a screen and its params into a standard browser pathname.
+ */
+function getUrlForScreen(screen, params = {}) {
+  const search = new URLSearchParams();
+  if (screen === "category") {
+    if (params.categoryId) search.set("cat", params.categoryId);
+    if (params.area && params.area !== "All") search.set("area", params.area);
+  } else if (screen === "product") {
+    if (params.productId) search.set("id", params.productId);
+  } else if (params.preview) {
+    search.set("preview", params.preview);
+  }
+
+  const qs = search.toString() ? `?${search.toString()}` : "";
+  if (screen === "home") return `/${qs}`;
+  return `/${screen}${qs}`;
+}
+
+export default function App() {
+  const initialLoc = parseLocation();
+  const [screen, setScreen] = useState(initialLoc.screen);
+  const [screenParams, setScreenParams] = useState(initialLoc.params);
+  const [selectedProduct, setSelectedProduct] = useState(() => {
+    if (initialLoc.params.productId) {
+      const found = PRODUCTS.find((p) => p.id === initialLoc.params.productId);
+      if (found) return found;
+    }
+    return PRODUCTS[0];
   });
-  const [screenParams, setScreenParams] = useState({});
-  const [selectedProduct, setSelectedProduct] = useState(PRODUCTS[0]);
   const [searchQuery, setSearchQuery] = useState("");
   const [toast, setToast] = useState(null);
   const [aboutModalOpen, setAboutModalOpen] = useState(false);
@@ -219,6 +285,22 @@ export default function App() {
     return unsubscribe;
   }, []);
 
+  // ── Browser History (PopState) listener ────────────────────────────────────
+  // When user clicks browser Back / Forward buttons, keep screen in sync
+  useEffect(() => {
+    const handlePopState = () => {
+      const loc = parseLocation();
+      setScreen(loc.screen);
+      setScreenParams(loc.params);
+      if (loc.params.productId) {
+        const found = PRODUCTS.find((p) => p.id === loc.params.productId);
+        if (found) setSelectedProduct(found);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   // ── Sign-out handler ───────────────────────────────────────────────────────
   const handleSignOut = async () => {
     await signOutUser();
@@ -231,16 +313,28 @@ export default function App() {
   // Merge profile edits (name, phone, avatar…) into the signed-in user
   const handleProfileUpdated = (patch) => setCurrentUser((prev) => (prev ? { ...prev, ...patch } : prev));
 
-  // Navigation function
-  const nav = (newScreen, params = {}) => {
+  // Navigation function with clean URL updates
+  const nav = (newScreen, params = {}, replace = false) => {
     setScreen(newScreen);
     setScreenParams(params);
     window.scrollTo({ top: 0, behavior: "smooth" });
+
+    if (typeof window !== "undefined") {
+      const targetUrl = getUrlForScreen(newScreen, params);
+      const currentUrl = window.location.pathname + window.location.search;
+      if (targetUrl !== currentUrl) {
+        if (replace) {
+          window.history.replaceState({ screen: newScreen, params }, "", targetUrl);
+        } else {
+          window.history.pushState({ screen: newScreen, params }, "", targetUrl);
+        }
+      }
+    }
   };
 
   const handleSelectProduct = (product) => {
     setSelectedProduct(product);
-    nav("product");
+    nav("product", { productId: product.id });
   };
 
   const handleAddToBasket = (product, quantity = 1) => {

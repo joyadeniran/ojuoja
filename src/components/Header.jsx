@@ -62,7 +62,7 @@ export function Header({
       >
         {/* Brand Logo */}
         <a
-          href="#home"
+          href="/"
           onClick={(e) => {
             e.preventDefault();
             onNav("home");
@@ -202,7 +202,7 @@ export function Header({
           className="oj-desktop-nav"
         >
           <a
-            href="#vendors"
+            href="/vendors"
             onClick={(e) => {
               e.preventDefault();
               onNav("vendors");

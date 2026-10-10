@@ -78,7 +78,7 @@ export function CategoryScreen({
         items={[
           {
             label: "Home",
-            href: "#home",
+            href: "/",
             onClick: (e) => {
               e.preventDefault();
               onNav("home");

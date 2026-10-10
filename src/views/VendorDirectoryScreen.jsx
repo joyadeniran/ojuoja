@@ -23,7 +23,7 @@ export function VendorDirectoryScreen({ onNav, onOpenVendorModal }) {
         items={[
           {
             label: "Home",
-            href: "#home",
+            href: "/",
             onClick: (e) => {
               e.preventDefault();
               onNav("home");

@@ -95,7 +95,7 @@ export function BasketScreen({
         items={[
           {
             label: "Home",
-            href: "#home",
+            href: "/",
             onClick: (e) => {
               e.preventDefault();
               onNav("home");

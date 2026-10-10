@@ -62,7 +62,7 @@ export function Footer({ onNav, onOpenAbout, onOpenVendorModal }) {
               (cat) => (
                 <a
                   key={cat}
-                  href="#category"
+                  href="/category"
                   onClick={(e) => {
                     e.preventDefault();
                     onNav("category");
@@ -128,7 +128,7 @@ export function Footer({ onNav, onOpenAbout, onOpenVendorModal }) {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <a
-              href="#vendors"
+              href="/vendors"
               onClick={(e) => {
                 e.preventDefault();
                 onNav("vendors");

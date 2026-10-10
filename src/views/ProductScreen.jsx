@@ -52,7 +52,7 @@ export function ProductScreen({
         items={[
           {
             label: "Home",
-            href: "#home",
+            href: "/",
             onClick: (e) => {
               e.preventDefault();
               onNav("home");
@@ -60,7 +60,7 @@ export function ProductScreen({
           },
           {
             label: p.category === "food-snacks" ? "Food & Snacks" : p.category === "drinks" ? "Drinks" : "Groceries",
-            href: "#category",
+            href: "/category",
             onClick: (e) => {
               e.preventDefault();
               onNav("category", { categoryId: p.category });
