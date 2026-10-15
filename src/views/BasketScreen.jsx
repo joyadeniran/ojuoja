@@ -36,6 +36,10 @@ export function BasketScreen({
   const [phoneNumber, setPhoneNumber] = useState("0803 123 4567");
   const [deliveryNote, setDeliveryNote] = useState("");
   const [orderSuccess, setOrderSuccess] = useState(false);
+  const [saving, setSaving] = useState(false);
+  // Set when Paystack charged the customer but the order failed to save, so a
+  // retry re-uses the payment instead of charging them a second time.
+  const [paidRef, setPaidRef] = useState(null);
 
   const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
   const delivery = subtotal > 10000 || subtotal === 0 ? 0 : 700;
@@ -44,10 +48,11 @@ export function BasketScreen({
   const vendorCount = new Set(items.map((i) => i.vendor)).size;
 
   const handlePlaceOrder = async () => {
-    let paymentReference = null;
-    let paymentStatus = "unpaid";
+    let paymentReference = paidRef;
+    let paymentStatus = paidRef ? "paid" : "unpaid";
+    setPayError("");
 
-    if (payMethod === "paystack") {
+    if (payMethod === "paystack" && !paidRef) {
       setPayError("");
       setPaying(true);
       try {
@@ -67,20 +72,42 @@ export function BasketScreen({
       setPaying(false);
     }
 
-    setOrderSuccess(true);
-    if (onCheckout) {
-      onCheckout({
+    if (!onCheckout) return;
+
+    setSaving(true);
+    let result;
+    try {
+      result = await onCheckout({
         items,
         subtotal,
         delivery,
         total,
         address: `${streetAddress}, ${selectedArea}, Ikorodu`,
         phone: phoneNumber,
-        paymentMethod: payMethod,
+        paymentMethod: paidRef ? "paystack" : payMethod,
         paymentReference,
         paymentStatus,
       });
+    } catch (err) {
+      result = { success: false, error: err.message };
     }
+    setSaving(false);
+
+    if (!result?.success) {
+      if (paymentStatus === "paid") {
+        setPaidRef(paymentReference);
+        setPayError(
+          `Your payment went through (ref: ${paymentReference}) but we couldn't record your order. ` +
+          `Tap "Retry saving order" — you will NOT be charged again. If it keeps failing, contact us with this reference.`
+        );
+      } else {
+        setPayError("We couldn't place your order. Please check your connection and try again.");
+      }
+      return;
+    }
+
+    setPaidRef(null);
+    setOrderSuccess(true);
   };
 
   const handleOrderDismiss = () => {
@@ -342,9 +369,17 @@ export function BasketScreen({
                   size="lg"
                   badgeIcon="wallet"
                   onClick={handlePlaceOrder}
-                  disabled={!streetAddress || !phoneNumber || paying || items.length === 0}
+                  disabled={!streetAddress || !phoneNumber || paying || saving || items.length === 0}
                 >
-                  {paying ? "Opening payment…" : payMethod === "paystack" ? `Pay ${naira(total)} now` : "Place Order"}
+                  {paying
+                    ? "Opening payment…"
+                    : saving
+                    ? "Placing order…"
+                    : paidRef
+                    ? "Retry saving order"
+                    : payMethod === "paystack"
+                    ? `Pay ${naira(total)} now`
+                    : "Place Order"}
                 </Button>
               </div>
 

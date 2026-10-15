@@ -67,6 +67,13 @@ export function BecomeVendorModal({ open, onClose, onSubmitSuccess, currentUser 
       return;
     }
 
+    // The database only accepts applications from signed-in users (RLS),
+    // so stop here instead of showing a fake "submitted" screen.
+    if (!currentUser?.id) {
+      setError("Please sign in or create a free account first, then submit your application.");
+      return;
+    }
+
     setLoading(true);
 
     const payload = {
@@ -79,16 +86,18 @@ export function BecomeVendorModal({ open, onClose, onSubmitSuccess, currentUser 
 
     try {
       // Write directly to Supabase from inside the modal
-      const result = await submitVendorApplication(payload, currentUser?.id || null);
+      const result = await submitVendorApplication(payload, currentUser.id);
 
-      if (!result.success && !result.localOnly) {
-        setError("We couldn't submit your application right now. Please try again.");
+      if (!result.success) {
+        setError("We couldn't submit your application right now. Please check your connection and try again.");
         setLoading(false);
         return;
       }
     } catch (err) {
-      // Network / unexpected error — still show success as the data is captured
       console.warn("Vendor application error:", err);
+      setError("We couldn't submit your application right now. Please check your connection and try again.");
+      setLoading(false);
+      return;
     }
 
     setLoading(false);

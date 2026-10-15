@@ -481,11 +481,17 @@ export default function App() {
             onRemove={(idx) => setBasket((prev) => prev.filter((_, j) => j !== idx))}
             onClearBasket={() => setBasket([])}
             onCheckout={async (order) => {
-              // Persist order to Supabase (attach customer_id if logged in)
+              // Persist order to Supabase (attach customer_id if logged in).
+              // If it fails, stop here so BasketScreen can show an error
+              // instead of a fake "confirmed" screen.
+              let saved;
               try {
-                await createSupabaseOrder(order, currentUser?.id || null);
+                saved = await createSupabaseOrder(order, currentUser?.id || null);
               } catch (err) {
-                console.info("Supabase order sync:", err);
+                saved = { success: false, error: err.message };
+              }
+              if (!saved?.success) {
+                return { success: false, error: saved?.error };
               }
 
               const vendorNames = Array.from(new Set(order.items.map((i) => i.vendor))).filter(Boolean).join(", ");
@@ -546,6 +552,7 @@ export default function App() {
                 title: "Order & Dispatch Active!",
                 message: `Vendor, dispatch rider & ops notified for ${order.address}.`,
               });
+              return { success: true };
             }}
           />
         )}

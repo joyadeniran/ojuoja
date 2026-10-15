@@ -359,13 +359,15 @@ export async function createOrder(orderPayload, userId = null) {
     }
 
     if (error) {
-      console.warn("Could not insert order into Supabase, recorded locally:", error.message);
-      return { success: true, localOnly: true, data: orderPayload };
+      // Nothing is stored locally, so never report success on a failed insert —
+      // otherwise the customer sees "confirmed" and the order silently vanishes.
+      console.warn("Could not insert order into Supabase:", error.message);
+      return { success: false, error: error.message };
     }
-    return { success: true, localOnly: false, data };
+    return { success: true, data };
   } catch (err) {
-    console.warn("Order recorded locally:", err);
-    return { success: true, localOnly: true, data: orderPayload };
+    console.warn("Order insert failed:", err);
+    return { success: false, error: err.message };
   }
 }
 
@@ -409,13 +411,15 @@ export async function submitVendorApplication(vendorPayload, userId = null) {
       .select();
 
     if (error) {
+      // Do NOT report success here — nothing is stored anywhere else, so a
+      // swallowed error means the application is silently lost.
       console.warn("Could not record vendor application:", error.message);
-      return { success: true, localOnly: true, data: vendorPayload };
+      return { success: false, error: error.message };
     }
-    return { success: true, localOnly: false, data };
+    return { success: true, data };
   } catch (err) {
-    console.warn("Vendor application saved locally:", err);
-    return { success: true, localOnly: true, data: vendorPayload };
+    console.warn("Vendor application failed:", err);
+    return { success: false, error: err.message };
   }
 }
 
